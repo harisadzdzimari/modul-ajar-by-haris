@@ -116,6 +116,14 @@ st.markdown("""
         box-shadow: 0px -4px 10px rgba(0,0,0,0.1);
         z-index: 999;
     }
+    
+    /* Subheader Style */
+    .custom-subheader {
+        color: #0d47a1;
+        font-weight: bold;
+        margin-top: 10px;
+        margin-bottom: 5px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -184,7 +192,7 @@ def create_docx(data):
              ("Topik", data['topik']), ("Model", data['model'])]
     for k, v in infos:
         r = table.add_row()
-        r.cells[0].text = k; r.cells[1].text = v
+        r.cells[0].text = k; r.cells[0].paragraphs[0].runs[0].bold = True; r.cells[1].text = v
 
     doc.add_paragraph(f"\nCP: {data['cp']}")
 
@@ -193,36 +201,52 @@ def create_docx(data):
     doc.add_heading('A. Tujuan', level=2); doc.add_paragraph(data['tujuan'])
     doc.add_heading('B. Pemantik', level=2); doc.add_paragraph(data['pemantik'])
     
-    # III. Kegiatan
-    doc.add_heading('III. KEGIATAN', level=1)
-    doc.add_heading('1. Materi', level=2); doc.add_paragraph(data['bahan'])
-    doc.add_heading('2. LKPD', level=2); doc.add_paragraph(data['lkpd'])
+    # III. Kegiatan (STRUKTUR BARU)
+    doc.add_heading('III. KEGIATAN PEMBELAJARAN', level=1)
+    doc.add_heading('1. Ringkasan Bahan Ajar', level=2)
+    doc.add_paragraph(data['bahan'])
+    
+    doc.add_heading('2. Desain LKPD', level=2)
+    doc.add_paragraph("Petunjuk Pengerjaan:")
+    doc.add_paragraph(data['lkpd'])
+    doc.add_paragraph("\nMedia Ajar:")
+    doc.add_paragraph(data['media'])
     
     # IV. Evaluasi
     doc.add_heading('IV. EVALUASI', level=1)
     doc.add_paragraph(data['soal'])
     
-    # V. Absensi (FITUR BARU)
+    # V. Absensi (NAMA SISWA OTOMATIS)
     doc.add_page_break()
     doc.add_heading('V. DAFTAR HADIR SISWA', level=1)
     doc.add_paragraph(f"Kelas: {data['kelas']} | Tanggal: {data['tanggal'].strftime('%d-%m-%Y')}")
     
-    # Tabel Absensi Otomatis
-    jml = data['jml_siswa']
-    t_absen = doc.add_table(rows=1, cols=5); t_absen.style = 'Table Grid'
-    hdr = t_absen.rows[0].cells
-    hdr[0].text = "No"; hdr[1].text = "Nama Siswa"; hdr[2].text = "Hadir"; hdr[3].text = "Sakit/Izin"; hdr[4].text = "Ket"
-    
-    for i in range(jml):
-        row = t_absen.add_row().cells
-        row[0].text = str(i+1)
-        row[1].text = "" # Kosong untuk ditulis manual
+    # Logic Tabel Nama Siswa
+    siswa_list = data['siswa_list']
+    if not siswa_list: # Kalau kosong, bikin 25 baris kosong
+        jml = 25
+        t_absen = doc.add_table(rows=1, cols=5); t_absen.style = 'Table Grid'
+        hdr = t_absen.rows[0].cells
+        hdr[0].text = "No"; hdr[1].text = "Nama Siswa"; hdr[2].text = "Hadir"; hdr[3].text = "Sakit/Izin"; hdr[4].text = "Ket"
+        for i in range(jml):
+            row = t_absen.add_row().cells
+            row[0].text = str(i+1); row[1].text = ""
+    else:
+        # Kalau ada nama siswa
+        t_absen = doc.add_table(rows=1, cols=5); t_absen.style = 'Table Grid'
+        hdr = t_absen.rows[0].cells
+        hdr[0].text = "No"; hdr[1].text = "Nama Siswa"; hdr[2].text = "Hadir"; hdr[3].text = "Sakit/Izin"; hdr[4].text = "Ket"
+        for i, nama in enumerate(siswa_list):
+            row = t_absen.add_row().cells
+            row[0].text = str(i+1)
+            row[1].text = nama.strip()
 
     # VI. Lampiran
     doc.add_paragraph("\n")
     doc.add_heading('VI. LAMPIRAN', level=1)
-    doc.add_heading('Glosarium', level=2); doc.add_paragraph(data['glosarium'])
-    doc.add_heading('Refleksi', level=2); doc.add_paragraph(data['refleksi'])
+    doc.add_heading('A. Daftar Pustaka', level=2); doc.add_paragraph(data['pustaka'])
+    doc.add_heading('B. Glosarium', level=2); doc.add_paragraph(data['glosarium'])
+    doc.add_heading('C. Refleksi', level=2); doc.add_paragraph(data['refleksi'])
 
     # TTD
     doc.add_paragraph("\n\n")
@@ -251,15 +275,22 @@ def create_pdf(data):
     pdf.cell(0, 10, safe_text(f"Model: {data['model']}"), ln=True)
     pdf.ln(5)
     
-    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, "TUJUAN PEMBELAJARAN:", ln=True)
-    pdf.set_font("Arial", size=11); pdf.multi_cell(0, 6, safe_text(data['tujuan'])); pdf.ln(3)
-    
-    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, "MATERI INTI:", ln=True)
-    pdf.set_font("Arial", size=11); pdf.multi_cell(0, 6, safe_text(data['bahan'][:1000] + "...")); pdf.ln(3)
+    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, "1. RINGKASAN MATERI:", ln=True)
+    pdf.set_font("Arial", size=11); pdf.multi_cell(0, 6, safe_text(data['bahan'][:800] + "...")); pdf.ln(3)
 
-    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, "ABSENSI SISWA:", ln=True)
+    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, "2. PETUNJUK LKPD:", ln=True)
+    pdf.set_font("Arial", size=11); pdf.multi_cell(0, 6, safe_text(data['lkpd'])); pdf.ln(3)
+
+    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, "3. DAFTAR HADIR:", ln=True)
     pdf.set_font("Arial", size=11)
-    pdf.cell(0, 10, safe_text(f"Tabel absensi untuk {data['jml_siswa']} siswa telah digenerate (lihat versi Word)."), ln=True)
+    
+    # Render Nama Siswa di PDF
+    siswa_list = data['siswa_list']
+    if not siswa_list:
+        pdf.cell(0, 10, safe_text("(Daftar siswa kosong, silakan isi di Tab Asesmen)"), ln=True)
+    else:
+        for i, nama in enumerate(siswa_list):
+             pdf.cell(0, 8, safe_text(f"{i+1}. {nama}"), ln=True)
     
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
@@ -318,7 +349,7 @@ def main_app():
 
     # --- TABS ---
     t1, t2, t3, t4, t5, t6, t7 = st.tabs([
-        "1️⃣ Identitas", "2️⃣ Inti (AI)", "3️⃣ Bahan (AI)", 
+        "1️⃣ Identitas", "2️⃣ Inti (AI)", "3️⃣ Bahan & LKPD (AI)", 
         "4️⃣ Evaluasi", "5️⃣ Asesmen", "6️⃣ Glosarium", "7️⃣ Refleksi"
     ])
 
@@ -338,7 +369,7 @@ def main_app():
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         topik = st.text_input("Topik Materi")
         
-        # --- PERMINTAAN: 4 MODEL PEMBELAJARAN ---
+        # --- PERMINTAAN: 4 MODEL SPESIFIK ---
         model_opsi = [
             "Problem-Based Learning (PBL)", 
             "Project-Based Learning (PjBL)", 
@@ -358,6 +389,7 @@ def main_app():
         pemantik = st.text_input("Pemantik")
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # --- TAB 3: BAHAN, LKPD, MEDIA ---
     with t3:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         if st.button("✨ Auto Materi & LKPD"):
@@ -365,11 +397,22 @@ def main_app():
              else:
                 with st.spinner("Menyusun..."):
                     st.session_state['materi_ai'] = tanya_gemini(api_key, f"Ringkasan materi {topik} SD kelas {kelas}.")
-                    st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan LKPD aktivitas siswa topik {topik}.")
+                    st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan langkah-langkah aktivitas siswa untuk LKPD topik {topik}.")
+                    st.session_state['media_ai'] = tanya_gemini(api_key, f"Sebutkan 3 media ajar/alat peraga sederhana untuk topik {topik}.")
         
-        c_a, c_b = st.columns(2)
-        with c_a: bahan = st.text_area("Materi", value=st.session_state.get('materi_ai', ''), height=200)
-        with c_b: lkpd = st.text_area("LKPD", value=st.session_state.get('lkpd_ai', ''), height=200)
+        # BAGIAN 1: RINGKASAN
+        st.markdown("<div class='custom-subheader'>📖 Ringkasan Bahan Ajar</div>", unsafe_allow_html=True)
+        bahan = st.text_area("Ringkasan Materi:", value=st.session_state.get('materi_ai', ''), height=200)
+        
+        st.divider()
+        
+        # BAGIAN 2: DESAIN LKPD
+        st.markdown("<div class='custom-subheader'>📝 Desain LKPD</div>", unsafe_allow_html=True)
+        lkpd = st.text_area("Petunjuk LKPD:", value=st.session_state.get('lkpd_ai', ''), height=200)
+        
+        # MEDIA AJAR (INPUT BARU)
+        media = st.text_area("Media Ajar (Alat & Bahan):", value=st.session_state.get('media_ai', ''), placeholder="Contoh: Video Youtube, Kertas Karton, Spidol...")
+        
         st.markdown("</div>", unsafe_allow_html=True)
 
     with t4:
@@ -383,20 +426,35 @@ def main_app():
 
     with t5:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
-        st.subheader("📊 Asesmen & Absensi")
+        st.subheader("📊 Daftar Hadir Siswa")
         
-        # --- PERMINTAAN: ABSENSI OTOMATIS ---
-        st.info("Masukkan jumlah siswa, tabel absensi otomatis dibuat di file Word.")
-        jml_siswa = st.number_input("Jumlah Siswa di Kelas", min_value=1, value=25)
+        # --- PERMINTAAN: KETIK NAMA SISWA LANGSUNG ---
+        st.info("Ketik/Paste nama siswa di bawah ini (Satu nama per baris). Tabel Absensi di Word akan otomatis terisi.")
+        raw_siswa = st.text_area("Daftar Nama Siswa:", height=200, placeholder="Ahmad\nBudi\nCitra\n...")
+        
+        # Proses String menjadi List
+        siswa_list = raw_siswa.split('\n') if raw_siswa else []
+        siswa_list = [nama for nama in siswa_list if nama.strip()] # Hapus baris kosong
+        
+        st.write(f"Terdeteksi: **{len(siswa_list)} Siswa**")
         
         st.divider()
-        st.write("Rubrik Penilaian Sikap (Profil Pelajar Pancasila):")
+        st.write("Rubrik Penilaian Sikap:")
         profil = st.multiselect("Dimensi", ["Mandiri", "Bernalar Kritis", "Gotong Royong", "Kreatif"], default=["Mandiri"])
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # --- TAB 6: GLOSARIUM & PUSTAKA ---
     with t6:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
-        glosarium = st.text_area("Glosarium", placeholder="Istilah sulit...", height=150)
+        
+        st.markdown("<div class='custom-subheader'>📚 Daftar Pustaka</div>", unsafe_allow_html=True)
+        pustaka = st.text_area("Sumber Belajar:", value=f"1. Buku Paket Kemdikbud Kelas {kelas}\n2. Video Pembelajaran Youtube", height=100)
+        
+        st.divider()
+        
+        st.markdown("<div class='custom-subheader'>🔤 Glosarium</div>", unsafe_allow_html=True)
+        glosarium = st.text_area("Istilah Sulit:", placeholder="Contoh: Ekosistem adalah...", height=150)
+        
         st.markdown("</div>", unsafe_allow_html=True)
 
     with t7:
@@ -412,8 +470,9 @@ def main_app():
         'sekolah': nama_sekolah, 'alamat': alamat_sekolah, 'kepsek': kepsek,
         'guru': nama_guru, 'mapel': mapel, 'kelas': kelas, 'tanggal': tanggal,
         'cp': cp, 'topik': topik, 'model': model, 'tujuan': tujuan, 'pemantik': pemantik,
-        'bahan': bahan, 'lkpd': lkpd, 'soal': soal, 'jml_siswa': jml_siswa,
-        'glosarium': glosarium, 'refleksi': refleksi
+        'bahan': bahan, 'lkpd': lkpd, 'media': media, 'soal': soal,
+        'siswa_list': siswa_list, # List nama siswa dikirim ke fungsi docx
+        'pustaka': pustaka, 'glosarium': glosarium, 'refleksi': refleksi
     }
     
     c_dl1, c_dl2 = st.columns(2)
@@ -421,7 +480,6 @@ def main_app():
         docx = create_docx(data)
         st.download_button("📄 DOWNLOAD WORD (.DOCX)", docx, f"Modul_{topik}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     with c_dl2:
-        # PERMINTAAN: DOWNLOAD PDF
         pdf = create_pdf(data)
         st.download_button("📕 DOWNLOAD PDF", pdf, f"Modul_{topik}.pdf", "application/pdf")
         
