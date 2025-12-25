@@ -169,15 +169,14 @@ def render_header():
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. FUNGSI LOGIKA (AI, DOCX, PDF)
-# ==========================================
-
+# 3 FUNGSI LOGIKA (AI, DOCX, PDF) ---
 def tanya_gemini(api_key, prompt):
     if not api_key:
         return "⚠️ Masukkan API Key di Sidebar terlebih dahulu!"
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
+        # GANTI MODEL DI SINI: dari 'gemini-pro' menjadi 'gemini-1.5-flash'
+        model = genai.GenerativeModel('gemini-1.5-flash') 
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
@@ -469,3 +468,4 @@ if __name__ == "__main__":
     if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
     if not st.session_state['logged_in']: login_page()
     else: main_app()
+
