@@ -102,18 +102,28 @@ def tanya_gemini(api_key, prompt):
     if not api_key:
         return "⚠️ Masukkan API Key di Sidebar terlebih dahulu!"
     try:
-        # Konfigurasi API Key
+        # Konfigurasi
         genai.configure(api_key=api_key)
         
-        # SOLUSI ERROR 404:
-        # Kita pakai 'gemini-pro' karena ini model paling universal dan stabil.
-        # Jangan pakai 'flash' dulu jika library di server belum support.
-        model = genai.GenerativeModel('gemini-pro') 
-        
-        response = model.generate_content(prompt)
-        return response.text
+        # Kita coba model terbaru dulu
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(prompt)
+            return response.text
+        except:
+            # Jika server masih jadul, kita pakai model cadangan (legacy)
+            model = genai.GenerativeModel('gemini-pro')
+            response = model.generate_content(prompt)
+            return response.text
+            
     except Exception as e:
-        return f"Error AI: {str(e)}"
+        return f"""
+        ❌ Terjadi Error: {str(e)}
+        
+        TIPS PERBAIKAN:
+        1. Jika di Localhost: Buka terminal, ketik 'pip install --upgrade google-generativeai'
+        2. Jika di Streamlit Cloud: Pastikan ada file 'requirements.txt' isinya 'google-generativeai>=0.5.0'
+        """
 
 def create_docx(data):
     doc = Document()
@@ -413,5 +423,6 @@ if not st.session_state['logged_in']:
             if u=="guru" and p=="123": st.session_state['logged_in']=True; st.rerun()
             else: st.error("Gagal")
 else: main_app()
+
 
 
