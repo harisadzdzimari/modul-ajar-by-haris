@@ -12,18 +12,18 @@ from fpdf import FPDF
 st.set_page_config(page_title="Sistem Modul Ajar Sultan AI", layout="wide", page_icon="🏫")
 
 # ==========================================
-# 1. STYLE SKEUOMORPHISM (TAMPILAN NYATA)
+# 1. CSS SKEUOMORPHISM & ANIMASI
 # ==========================================
 st.markdown("""
 <style>
-    /* Latar Belakang Utama */
+    /* Latar Belakang */
     .stApp {
         background-color: #e0e5ec;
         font-family: 'Segoe UI', sans-serif;
         color: #4d4d4d;
     }
 
-    /* Container Skeuomorphism (Kotak Timbul) */
+    /* Card Skeuomorphism */
     .skeuo-card {
         border-radius: 20px;
         background: #e0e5ec;
@@ -34,7 +34,7 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.2);
     }
 
-    /* Input Fields (Efek Tenggelam) */
+    /* Input Fields */
     .stTextInput > div > div > input, 
     .stTextArea > div > div > textarea, 
     .stSelectbox > div > div > div,
@@ -48,14 +48,8 @@ st.markdown("""
         color: #333 !important;
         padding: 10px;
     }
-    
-    /* Label Input */
-    .stTextInput > label, .stTextArea > label, .stSelectbox > label, .stNumberInput > label, .stDateInput > label {
-        color: #444 !important;
-        font-weight: bold;
-    }
 
-    /* Tombol Skeuomorphism */
+    /* Tombol */
     .stButton > button {
         width: 100%;
         border: none;
@@ -69,11 +63,6 @@ st.markdown("""
         transition: all 0.2s ease-in-out;
         padding: 10px 20px;
     }
-    
-    .stButton > button:hover {
-        background: linear-gradient(145deg, #cacaca, #f0f0f3);
-    }
-
     .stButton > button:active {
         background: #e0e5ec;
         box-shadow: inset 4px 4px 8px #bebebe, 
@@ -81,297 +70,364 @@ st.markdown("""
         transform: translateY(2px);
     }
 
-    /* Header Title Style */
-    .header-title {
-        color: #0d47a1;
-        text-shadow: 1px 1px 2px white;
-        text-align: center;
-        margin: 0;
-        padding-bottom: 5px;
-    }
-    
-    /* Login Box */
-    .login-container {
-        max-width: 400px;
-        margin: auto;
-        padding: 40px;
-        border-radius: 30px;
+    /* HEADER STYLE */
+    .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         background: #e0e5ec;
-        box-shadow: 15px 15px 30px #bebebe, -15px -15px 30px #ffffff;
+        padding: 15px 20px;
+        border-radius: 15px;
+        box-shadow:  5px 5px 10px #bebebe, -5px -5px 10px #ffffff;
+        margin-bottom: 25px;
+    }
+    .running-text {
+        width: 65%;
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        color: #2c3e50;
+        font-size: 16px;
+    }
+    .live-clock {
+        width: 30%;
+        text-align: right;
+        font-family: 'Arial', sans-serif;
+        font-weight: bold;
+        color: #0d47a1;
+        background: #e0e5ec;
+        padding: 5px 15px;
+        border-radius: 8px;
+        box-shadow: inset 3px 3px 6px #bebebe, inset -3px -3px 6px #ffffff;
+        font-size: 14px;
+    }
+
+    /* FOOTER */
+    .footer {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background-color: #e0e5ec;
+        color: #555;
         text-align: center;
+        padding: 10px;
+        font-size: 14px;
+        font-weight: bold;
+        box-shadow: 0px -4px 10px rgba(0,0,0,0.1);
+        z-index: 999;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. FUNGSI LOGIKA (AI & DOCX)
+# 2. LOGIKA HEADER & CLOCK (JAVASCRIPT)
+# ==========================================
+def render_header():
+    st.markdown("""
+        <div class="header-container">
+            <div class="running-text">
+                <marquee direction="left" scrollamount="6">
+                    🚀 SELAMAT DATANG DI SISTEM MODUL AJAR SULTAN AI - "Mewujudkan Generasi Cerdas & Berakhlak Mulia" 🚀
+                </marquee>
+            </div>
+            <div id="clock" class="live-clock">Loading Waktu...</div>
+        </div>
+        
+        <script>
+            function updateTime() {
+                const now = new Date();
+                const optionsDate = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                const dateStr = now.toLocaleDateString('id-ID', optionsDate);
+                const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                document.getElementById('clock').innerHTML = dateStr + '<br>' + timeStr + ' WIB';
+            }
+            setInterval(updateTime, 1000);
+            updateTime();
+        </script>
+        
+        <div class="footer">
+            Aplikasi by Haris Adz Dzimari
+        </div>
+    """, unsafe_allow_html=True)
+
+# ==========================================
+# 3. FUNGSI AI & EXPORT DOKUMEN
 # ==========================================
 def tanya_gemini(api_key, prompt):
-    if not api_key:
-        return "⚠️ Masukkan API Key di Sidebar terlebih dahulu!"
+    if not api_key: return "⚠️ Masukkan API Key dulu!"
     try:
         genai.configure(api_key=api_key)
-        # MENGGUNAKAN MODEL STABIL (GEMINI-PRO)
         model = genai.GenerativeModel('gemini-pro') 
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"Error: {str(e)}"
+        return model.generate_content(prompt).text
+    except Exception as e: return f"Error: {str(e)}"
 
+# --- EXPORT WORD (.DOCX) ---
 def create_docx(data):
     doc = Document()
     for section in doc.sections:
         section.top_margin = Cm(2.54); section.bottom_margin = Cm(2.54)
         section.left_margin = Cm(2.54); section.right_margin = Cm(2.54)
 
-    # HEADER
-    head = doc.add_paragraph()
-    head.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = head.add_run(f"MODUL AJAR KURIKULUM MERDEKA\n{data['sekolah']}\n")
-    run.bold = True; run.font.size = Pt(14)
-    head.add_run(f"{data['alamat']}").font.size = Pt(10)
+    # Header
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run(f"MODUL AJAR KURIKULUM MERDEKA\n{data['sekolah']}\n")
+    r.bold = True; r.font.size = Pt(14)
+    p.add_run(f"{data['alamat']}").font.size = Pt(10)
     doc.add_paragraph("_"*85)
 
-    # I. INFORMASI UMUM
+    # I. Info Umum
     doc.add_heading('I. INFORMASI UMUM', level=1)
     table = doc.add_table(rows=0, cols=2); table.style = 'Table Grid'
     infos = [("Penyusun", data['guru']), ("Tahun", str(data['tanggal'].year)), 
-             ("Kelas/Fase", f"{data['kelas']} / {data['fase']}"), ("Mapel", data['mapel']), 
-             ("Topik", data['topik']), ("Alokasi", data['alokasi'])]
+             ("Kelas", data['kelas']), ("Mapel", data['mapel']), 
+             ("Topik", data['topik']), ("Model", data['model'])]
     for k, v in infos:
         r = table.add_row()
-        r.cells[0].text = k; r.cells[0].paragraphs[0].runs[0].bold = True; r.cells[1].text = v
+        r.cells[0].text = k; r.cells[1].text = v
 
-    doc.add_paragraph(f"\nCapaian Pembelajaran (CP): {data['cp']}")
+    doc.add_paragraph(f"\nCP: {data['cp']}")
 
-    # II. KOMPONEN INTI
+    # II. Komponen Inti
     doc.add_heading('II. KOMPONEN INTI', level=1)
-    doc.add_heading('A. Tujuan Pembelajaran', level=2); doc.add_paragraph(data['tujuan'])
+    doc.add_heading('A. Tujuan', level=2); doc.add_paragraph(data['tujuan'])
     doc.add_heading('B. Pemantik', level=2); doc.add_paragraph(data['pemantik'])
     
-    # III. KEGIATAN PEMBELAJARAN
-    doc.add_heading('III. KEGIATAN PEMBELAJARAN', level=1)
-    doc.add_heading('1. Materi Inti', level=2); doc.add_paragraph(data['bahan'])
-    doc.add_heading('2. Langkah LKPD', level=2); doc.add_paragraph(data['lkpd'])
+    # III. Kegiatan
+    doc.add_heading('III. KEGIATAN', level=1)
+    doc.add_heading('1. Materi', level=2); doc.add_paragraph(data['bahan'])
+    doc.add_heading('2. LKPD', level=2); doc.add_paragraph(data['lkpd'])
     
-    # IV. EVALUASI
-    doc.add_heading('IV. EVALUASI & ASESMEN', level=1)
+    # IV. Evaluasi
+    doc.add_heading('IV. EVALUASI', level=1)
     doc.add_paragraph(data['soal'])
     
-    # V. LAMPIRAN (GLOSARIUM & PUSTAKA)
+    # V. Absensi (FITUR BARU)
     doc.add_page_break()
-    doc.add_heading('V. LAMPIRAN', level=1)
-    doc.add_heading('A. Glosarium', level=2); doc.add_paragraph(data['glosarium'])
-    doc.add_heading('B. Daftar Pustaka', level=2); doc.add_paragraph(data['pustaka'])
+    doc.add_heading('V. DAFTAR HADIR SISWA', level=1)
+    doc.add_paragraph(f"Kelas: {data['kelas']} | Tanggal: {data['tanggal'].strftime('%d-%m-%Y')}")
     
-    # VI. REFLEKSI
-    doc.add_heading('C. Refleksi', level=2)
-    doc.add_paragraph(f"Refleksi Guru: {data['refleksi_guru']}")
-    doc.add_paragraph(f"Refleksi Siswa: {data['refleksi_siswa']}")
+    # Tabel Absensi Otomatis
+    jml = data['jml_siswa']
+    t_absen = doc.add_table(rows=1, cols=5); t_absen.style = 'Table Grid'
+    hdr = t_absen.rows[0].cells
+    hdr[0].text = "No"; hdr[1].text = "Nama Siswa"; hdr[2].text = "Hadir"; hdr[3].text = "Sakit/Izin"; hdr[4].text = "Ket"
+    
+    for i in range(jml):
+        row = t_absen.add_row().cells
+        row[0].text = str(i+1)
+        row[1].text = "" # Kosong untuk ditulis manual
+
+    # VI. Lampiran
+    doc.add_paragraph("\n")
+    doc.add_heading('VI. LAMPIRAN', level=1)
+    doc.add_heading('Glosarium', level=2); doc.add_paragraph(data['glosarium'])
+    doc.add_heading('Refleksi', level=2); doc.add_paragraph(data['refleksi'])
 
     # TTD
     doc.add_paragraph("\n\n")
     ttd = doc.add_table(rows=1, cols=2)
-    ttd.rows[0].cells[0].text = f"Mengetahui,\nKepala Sekolah\n\n\n( {data['kepsek']} )\nNIP. {data['nip']}"
+    ttd.rows[0].cells[0].text = f"Mengetahui,\nKepala Sekolah\n\n\n( {data['kepsek']} )"
     ttd.rows[0].cells[1].text = f"Sidoarjo, {data['tanggal'].strftime('%d %B %Y')}\nGuru Kelas\n\n\n( {data['guru']} )"
-    ttd.rows[0].cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-
+    
     buffer = BytesIO(); doc.save(buffer); buffer.seek(0)
     return buffer
 
+# --- EXPORT PDF (.PDF) ---
+class PDF(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, 'MODUL AJAR KURIKULUM MERDEKA', 0, 1, 'C')
+        self.ln(5)
+
+def create_pdf(data):
+    pdf = PDF(); pdf.add_page(); pdf.set_font("Arial", size=11)
+    
+    def safe_text(txt): 
+        return txt.encode('latin-1', 'replace').decode('latin-1')
+
+    pdf.cell(0, 10, safe_text(f"Sekolah: {data['sekolah']}"), ln=True)
+    pdf.cell(0, 10, safe_text(f"Guru: {data['guru']} | Kelas: {data['kelas']}"), ln=True)
+    pdf.cell(0, 10, safe_text(f"Model: {data['model']}"), ln=True)
+    pdf.ln(5)
+    
+    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, "TUJUAN PEMBELAJARAN:", ln=True)
+    pdf.set_font("Arial", size=11); pdf.multi_cell(0, 6, safe_text(data['tujuan'])); pdf.ln(3)
+    
+    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, "MATERI INTI:", ln=True)
+    pdf.set_font("Arial", size=11); pdf.multi_cell(0, 6, safe_text(data['bahan'][:1000] + "...")); pdf.ln(3)
+
+    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 10, "ABSENSI SISWA:", ln=True)
+    pdf.set_font("Arial", size=11)
+    pdf.cell(0, 10, safe_text(f"Tabel absensi untuk {data['jml_siswa']} siswa telah digenerate (lihat versi Word)."), ln=True)
+    
+    return pdf.output(dest='S').encode('latin-1', 'replace')
+
 # ==========================================
-# 3. LOGIN PAGE (SKEUOMORPHISM)
+# 4. HALAMAN LOGIN
 # ==========================================
 def login_page():
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    render_header()
+    st.markdown("<br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,1,1])
     with c2:
         st.markdown("""
-        <div class='login-container'>
-            <h2 style='color: #444; margin-bottom: 0;'>🔐 LOGIN SYSTEM</h2>
-            <p style='color: #777;'>Sistem Perangkat Ajar</p>
-            <hr style="border: 0; border-top: 1px solid #d1d9e6;">
+        <div class='login-container' style='background:#e0e5ec; padding:40px; border-radius:30px; box-shadow: 15px 15px 30px #bebebe, -15px -15px 30px #ffffff; text-align:center;'>
+            <h2 style='color:#444;'>🔐 LOGIN GURU</h2>
+            <hr>
         </div>
         """, unsafe_allow_html=True)
-        
-        username = st.text_input("Username", placeholder="ID Guru")
-        password = st.text_input("Password", type="password", placeholder="Kata Sandi")
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        if st.button("MASUK APLIKASI"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("MASUK"):
             if username == "guru" and password == "123":
                 st.session_state['logged_in'] = True
                 st.rerun()
-            else:
-                st.error("Username/Password Salah!")
+            else: st.error("Salah sandi!")
 
 # ==========================================
-# 4. MAIN APP (FITUR BARU + STYLE LAMA)
+# 5. APLIKASI UTAMA
 # ==========================================
 def main_app():
-    # Header Skeuomorphism
+    render_header()
+    
     st.markdown("""
-        <div class='skeuo-card' style='text-align: center;'>
-            <h1 class='header-title'>🏛️ SISTEM PERANGKAT AJAR TERPADU</h1>
-            <p style='margin:0; font-weight:bold; color:#666;'>SD MUHAMMADIYAH 8 TULANGAN | KURIKULUM MERDEKA</p>
+        <div class='skeuo-card' style='text-align:center;'>
+            <h1 style='color:#0d47a1; margin:0;'>💎 GENERATOR MODUL AJAR</h1>
+            <p>SD MUHAMMADIYAH 8 TULANGAN</p>
         </div>
     """, unsafe_allow_html=True)
 
-    # Sidebar Skeuomorphism
     with st.sidebar:
-        st.markdown("<div class='skeuo-card' style='text-align:center;'>⚙️ <b>KONFIGURASI</b></div>", unsafe_allow_html=True)
-        
+        st.markdown("<div class='skeuo-card' style='text-align:center;'>⚙️ <b>MENU</b></div>", unsafe_allow_html=True)
         if "GEMINI_API_KEY" in st.secrets:
             api_key = st.secrets["GEMINI_API_KEY"]
-            st.success("Cloud Connected ✅")
+            st.success("✅ AI Terhubung")
         else:
-            api_key = st.text_input("Gemini API Key", type="password")
-            st.caption("Tanpa API Key, fitur otomatis tidak berjalan.")
-
-        st.divider()
-        st.markdown("<b>🏫 Identitas Sekolah</b>", unsafe_allow_html=True)
-        nama_sekolah = st.text_input("Nama Sekolah", value="SD MUHAMMADIYAH 8 TULANGAN")
-        alamat_sekolah = st.text_area("Alamat", value="Jl. Raya Kenongo, Tulangan, Sidoarjo")
-        kepsek = st.text_input("Kepala Sekolah", value="Muhammad Saifudin Zuhri, M.Pd.")
-        nip = st.text_input("NIP", value="-")
+            api_key = st.text_input("API Key", type="password")
         
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.divider()
+        st.write("<b>Data Sekolah:</b>", unsafe_allow_html=True)
+        nama_sekolah = st.text_input("Sekolah", value="SD MUHAMMADIYAH 8 TULANGAN")
+        alamat_sekolah = st.text_area("Alamat", value="Jl. Raya Kenongo, Sidoarjo")
+        kepsek = st.text_input("Kepala Sekolah", value="Muhammad Saifudin Zuhri, M.Pd.")
+        
         if st.button("Logout"):
             st.session_state['logged_in'] = False
             st.rerun()
 
-    # --- 7 TABS LENGKAP ---
+    # --- TABS ---
     t1, t2, t3, t4, t5, t6, t7 = st.tabs([
-        "1️⃣ Identitas", 
-        "2️⃣ Inti (AI)", 
-        "3️⃣ Bahan (AI)", 
-        "4️⃣ Evaluasi", 
-        "5️⃣ Asesmen", 
-        "6️⃣ Glosarium", 
-        "7️⃣ Refleksi"
+        "1️⃣ Identitas", "2️⃣ Inti (AI)", "3️⃣ Bahan (AI)", 
+        "4️⃣ Evaluasi", "5️⃣ Asesmen", "6️⃣ Glosarium", "7️⃣ Refleksi"
     ])
 
-    # --- TAB 1: IDENTITAS ---
     with t1:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
-            nama_guru = st.text_input("Nama Guru Penyusun")
-            mapel = st.text_input("Mata Pelajaran", placeholder="Contoh: IPAS")
-            fase = st.selectbox("Fase", ["A (Kelas 1-2)", "B (Kelas 3-4)", "C (Kelas 5-6)"])
+            nama_guru = st.text_input("Guru", placeholder="Nama Lengkap")
+            mapel = st.text_input("Mapel", placeholder="Contoh: IPAS")
         with c2:
             kelas = st.selectbox("Kelas", ["1", "2", "3", "4", "5", "6"])
-            alokasi = st.text_input("Alokasi Waktu", value="2 x 35 Menit")
-            tanggal = st.date_input("Tanggal Pelaksanaan")
-        
-        st.divider()
-        cp = st.text_area("Capaian Pembelajaran (CP):", height=100)
+            tanggal = st.date_input("Tanggal")
+        cp = st.text_area("Capaian Pembelajaran (CP):", height=80)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- TAB 2: KOMPONEN INTI (AI) ---
     with t2:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
-        topik = st.text_input("Topik / Materi Pokok")
-        model_ajar = st.selectbox("Model Pembelajaran", ["PBL (Problem Based Learning)", "PjBL (Project Based Learning)", "Discovery Learning"])
+        topik = st.text_input("Topik Materi")
         
-        if st.button("✨ Generate Tujuan (AI)"):
-            if not api_key: st.error("API Key Belum Diisi!")
-            else:
-                with st.spinner("AI sedang berpikir..."):
-                    p = f"Buatkan tujuan pembelajaran dan pertanyaan pemantik untuk mapel {mapel} topik {topik} kelas {kelas} model {model_ajar}."
-                    res = tanya_gemini(api_key, p)
-                    st.session_state['tujuan_ai'] = res
+        # --- PERMINTAAN: 4 MODEL PEMBELAJARAN ---
+        model_opsi = [
+            "Problem-Based Learning (PBL)", 
+            "Project-Based Learning (PjBL)", 
+            "Discovery Learning (DL)", 
+            "Inquiry Learning (IL)"
+        ]
+        model = st.selectbox("Model Pembelajaran", model_opsi)
         
-        tujuan = st.text_area("Tujuan Pembelajaran:", value=st.session_state.get('tujuan_ai', ''), height=150)
-        pemantik = st.text_input("Pertanyaan Pemantik", placeholder="Pertanyaan awal untuk memancing rasa ingin tahu siswa")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # --- TAB 3: BAHAN & LKPD (AI) ---
-    with t3:
-        st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
-        if st.button("✨ Generate Materi & LKPD (AI)"):
+        if st.button("✨ Auto Tujuan"):
             if not api_key: st.error("API Key Kosong")
             else:
-                with st.spinner("Menyusun bahan ajar..."):
-                    res_materi = tanya_gemini(api_key, f"Ringkasan materi {topik} untuk SD kelas {kelas}.")
-                    st.session_state['materi_ai'] = res_materi
-                    res_lkpd = tanya_gemini(api_key, f"Buatkan langkah-langkah LKPD seru untuk topik {topik} kelas {kelas}.")
-                    st.session_state['lkpd_ai'] = res_lkpd
-
-        col_a, col_b = st.columns(2)
-        with col_a:
-            bahan = st.text_area("📘 Bahan Ajar", value=st.session_state.get('materi_ai', ''), height=300)
-        with col_b:
-            lkpd = st.text_area("📝 Instruksi LKPD", value=st.session_state.get('lkpd_ai', ''), height=300)
+                with st.spinner("AI Bekerja..."):
+                    p = f"Buatkan tujuan pembelajaran & pemantik mapel {mapel} topik {topik} kelas {kelas} model {model}."
+                    st.session_state['tujuan_ai'] = tanya_gemini(api_key, p)
+        
+        tujuan = st.text_area("Tujuan:", value=st.session_state.get('tujuan_ai', ''), height=150)
+        pemantik = st.text_input("Pemantik")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- TAB 4: EVALUASI (AI) ---
-    with t4:
+    with t3:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
-        if st.button("✨ Buat Soal Evaluasi"):
+        if st.button("✨ Auto Materi & LKPD"):
              if not api_key: st.error("API Key Kosong")
              else:
-                with st.spinner("Membuat soal..."):
-                    res_soal = tanya_gemini(api_key, f"Buatkan 5 soal essay HOTS topik {topik} kelas {kelas} dan kunci jawaban.")
-                    st.session_state['soal_ai'] = res_soal
+                with st.spinner("Menyusun..."):
+                    st.session_state['materi_ai'] = tanya_gemini(api_key, f"Ringkasan materi {topik} SD kelas {kelas}.")
+                    st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan LKPD aktivitas siswa topik {topik}.")
         
-        soal = st.text_area("Soal Evaluasi & Kunci Jawaban", value=st.session_state.get('soal_ai', ''), height=300)
+        c_a, c_b = st.columns(2)
+        with c_a: bahan = st.text_area("Materi", value=st.session_state.get('materi_ai', ''), height=200)
+        with c_b: lkpd = st.text_area("LKPD", value=st.session_state.get('lkpd_ai', ''), height=200)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- TAB 5: ASESMEN ---
+    with t4:
+        st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
+        if st.button("✨ Auto Soal"):
+             if not api_key: st.error("API Key Kosong")
+             else:
+                 st.session_state['soal_ai'] = tanya_gemini(api_key, f"5 Soal Essay HOTS {topik} & Kunci Jawaban.")
+        soal = st.text_area("Soal & Kunci", value=st.session_state.get('soal_ai', ''), height=200)
+        st.markdown("</div>", unsafe_allow_html=True)
+
     with t5:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
-        st.subheader("Rubrik Penilaian Sikap")
-        st.write("Rubrik akan otomatis digenerate di file Word berdasarkan dimensi yang dipilih.")
-        profil = st.multiselect("Dimensi Profil Pelajar Pancasila", ["Beriman", "Mandiri", "Bernalar Kritis", "Kreatif", "Gotong Royong"], default=["Mandiri", "Bernalar Kritis"])
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # --- TAB 6: GLOSARIUM (FITUR BARU) ---
-    with t6:
-        st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
+        st.subheader("📊 Asesmen & Absensi")
         
-        st.subheader("📚 Daftar Pustaka")
-        pustaka_default = "1. Buku Paket Kemdikbud Kelas " + str(kelas) + "\n2. Video Pembelajaran Youtube"
-        pustaka = st.text_area("Sumber Belajar", value=pustaka_default)
+        # --- PERMINTAAN: ABSENSI OTOMATIS ---
+        st.info("Masukkan jumlah siswa, tabel absensi otomatis dibuat di file Word.")
+        jml_siswa = st.number_input("Jumlah Siswa di Kelas", min_value=1, value=25)
         
         st.divider()
-        
-        st.subheader("🔤 Glosarium")
-        st.write("Daftar istilah sulit:")
-        glosarium = st.text_area("Glosarium", placeholder="Contoh:\n1. Ekosistem : Hubungan timbal balik...\n2. Abiotik : Benda tidak hidup...", height=150)
+        st.write("Rubrik Penilaian Sikap (Profil Pelajar Pancasila):")
+        profil = st.multiselect("Dimensi", ["Mandiri", "Bernalar Kritis", "Gotong Royong", "Kreatif"], default=["Mandiri"])
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- TAB 7: REFLEKSI (FITUR BARU) ---
+    with t6:
+        st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
+        glosarium = st.text_area("Glosarium", placeholder="Istilah sulit...", height=150)
+        st.markdown("</div>", unsafe_allow_html=True)
+
     with t7:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
-        st.subheader("💭 Refleksi Pembelajaran")
-        refleksi_guru = st.text_area("Refleksi Guru", placeholder="Apa yang sudah berjalan baik? Apa yang perlu diperbaiki?")
-        refleksi_siswa = st.text_area("Refleksi Siswa", placeholder="Bagaimana tanggapan siswa terhadap pembelajaran hari ini?")
+        refleksi = st.text_area("Refleksi", placeholder="Catatan refleksi guru & siswa...", height=150)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- DOWNLOAD SECTION ---
+    # --- DOWNLOAD AREA ---
     st.markdown("<div class='skeuo-card' style='text-align:center;'>", unsafe_allow_html=True)
-    st.success("✅ Dokumen Siap Diunduh")
-    if st.button("📄 DOWNLOAD MODUL AJAR (WORD)"):
-        data_modul = {
-            'sekolah': nama_sekolah, 'alamat': alamat_sekolah, 'kepsek': kepsek, 'nip': nip,
-            'guru': nama_guru, 'mapel': mapel, 'fase': fase, 'kelas': kelas, 'alokasi': alokasi, 'tanggal': tanggal,
-            'cp': cp, 'topik': topik, 'tujuan': tujuan, 'pemantik': pemantik,
-            'bahan': bahan, 'lkpd': lkpd, 'soal': soal,
-            'glosarium': glosarium, 'pustaka': pustaka,
-            'refleksi_guru': refleksi_guru, 'refleksi_siswa': refleksi_siswa
-        }
-        docx_file = create_docx(data_modul)
-        st.download_button("Klik untuk Unduh .DOCX", docx_file, file_name=f"Modul_{mapel}_{kelas}.docx")
+    st.success("✅ Dokumen Siap Unduh")
+    
+    data = {
+        'sekolah': nama_sekolah, 'alamat': alamat_sekolah, 'kepsek': kepsek,
+        'guru': nama_guru, 'mapel': mapel, 'kelas': kelas, 'tanggal': tanggal,
+        'cp': cp, 'topik': topik, 'model': model, 'tujuan': tujuan, 'pemantik': pemantik,
+        'bahan': bahan, 'lkpd': lkpd, 'soal': soal, 'jml_siswa': jml_siswa,
+        'glosarium': glosarium, 'refleksi': refleksi
+    }
+    
+    c_dl1, c_dl2 = st.columns(2)
+    with c_dl1:
+        docx = create_docx(data)
+        st.download_button("📄 DOWNLOAD WORD (.DOCX)", docx, f"Modul_{topik}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    with c_dl2:
+        # PERMINTAAN: DOWNLOAD PDF
+        pdf = create_pdf(data)
+        st.download_button("📕 DOWNLOAD PDF", pdf, f"Modul_{topik}.pdf", "application/pdf")
+        
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ==========================================
-# MAIN EXECUTION
-# ==========================================
 if __name__ == "__main__":
     if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
-    
-    if st.session_state['logged_in']:
-        main_app()
-    else:
-        login_page()
+    if st.session_state['logged_in']: main_app()
+    else: login_page()
