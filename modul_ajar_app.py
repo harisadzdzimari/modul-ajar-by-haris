@@ -175,8 +175,11 @@ def tanya_gemini(api_key, prompt):
         return "⚠️ Masukkan API Key di Sidebar terlebih dahulu!"
     try:
         genai.configure(api_key=api_key)
-        # KITA GANTI KE VERSI YANG LEBIH SPESIFIK & STABIL
-        model = genai.GenerativeModel('gemini-1.5-flash-002') 
+        
+        # PERBAIKAN DI SINI:
+        # Gunakan 'gemini-1.5-flash' yang lebih umum dan stabil
+        model = genai.GenerativeModel('gemini-1.5-flash') 
+        
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
@@ -308,7 +311,7 @@ def login_page():
         password = st.text_input("Password", type="password", placeholder="Kata Sandi")
         st.markdown("<br>", unsafe_allow_html=True)
         
-        if st.button("MASUK SISTEM", use_container_width=True):
+        if st.button("LOGIN", use_container_width=True):
             if username == "guru" and password == "123":
                 st.session_state['logged_in'] = True
                 st.session_state['user_name'] = "Guru Hebat"
@@ -328,8 +331,8 @@ def main_app():
 
     st.markdown("""
         <div class='skeuo-card' style='text-align: center;'>
-            <h1 style='color: #0d47a1; margin:0; text-shadow: 1px 1px 2px #fff;'>💎 SULTAN AI PRO</h1>
-            <p style='margin:0; font-weight:bold;'>Generator Modul Ajar (Skeuomorphism Edition)</p>
+            <h1 style='color: #0d47a1; margin:0; text-shadow: 1px 1px 2px #fff;'>💎 GENERATOR MODUL AJAR</h1>
+            <p style='margin:0; font-weight:bold;'>by Haris Adz Dzimari)</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -468,5 +471,6 @@ if __name__ == "__main__":
     if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
     if not st.session_state['logged_in']: login_page()
     else: main_app()
+
 
 
