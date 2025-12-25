@@ -332,7 +332,7 @@ def main_app():
     st.markdown("""
         <div class='skeuo-card' style='text-align: center;'>
             <h1 style='color: #0d47a1; margin:0; text-shadow: 1px 1px 2px #fff;'>💎 GENERATOR MODUL AJAR</h1>
-            <p style='margin:0; font-weight:bold;'>by Haris Adz Dzimari)</p>
+            <p style='margin:0; font-weight:bold;'>by Haris Adz Dzimari</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -356,7 +356,7 @@ def main_app():
         uploaded_logo = st.file_uploader("Logo", type=['png','jpg'])
         nama_sekolah = st.text_input("Sekolah", value="SD MUHAMMADIYAH 8 TULANGAN")
         alamat_sekolah = st.text_area("Alamat", value="Jl. Raya Kenongo RT. 02 RW. 01 Tulangan Sidoarjo")
-        kepsek = st.text_input("Kepala Sekolah", value="MUHAMMAD SAIFUDIN ZUHRI, M.Pd.")
+        kepsek = st.text_input("Kepala Sekolah", value="Muhammad Saifudin Zuhri, M.Pd.")
         nip_kepsek = st.text_input("NIP", value="-")
 
     t1, t2, t3, t4, t5 = st.tabs(["1️⃣ Identitas", "2️⃣ Inti (AI)", "3️⃣ Bahan (AI)", "4️⃣ Asesmen & Absen", "5️⃣ 📥 DOWNLOAD"])
@@ -471,6 +471,7 @@ if __name__ == "__main__":
     if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
     if not st.session_state['logged_in']: login_page()
     else: main_app()
+
 
 
 
