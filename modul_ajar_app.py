@@ -1,7 +1,8 @@
 import streamlit as st
 import datetime
 import pandas as pd
-import google.generativeai as genai
+import requests # KITA PAKAI INI UNTUK BYPASS ERROR LIBRARY
+import json
 from io import BytesIO
 from docx import Document
 from docx.shared import Inches, Pt, Cm
@@ -68,7 +69,6 @@ st.markdown("""
         color: #0d47a1; font-weight: bold; font-size: 14px; text-align: right;
     }
     
-    /* Custom Titles */
     h3 { color: #0d47a1; font-weight: bold; margin-bottom: 15px; }
     h4 { color: #333; font-weight: bold; margin-bottom: 10px; font-size: 16px; }
 </style>
@@ -96,34 +96,39 @@ def render_header():
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. FUNGSI LOGIKA (AI & DOKUMEN)
+# 3. FUNGSI LOGIKA (AI DIRECT API & DOKUMEN)
 # ==========================================
+
+# --- PERBAIKAN: MENGGUNAKAN REST API LANGSUNG (ANTI ERROR 404) ---
 def tanya_gemini(api_key, prompt):
-    if not api_key:
-        return "⚠️ Masukkan API Key di Sidebar terlebih dahulu!"
+    if not api_key: return "⚠️ Masukkan API Key!"
+    
+    # URL API Google (Kita pakai jalur web langsung, bukan lewat library yg error)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+    
     try:
-        # Konfigurasi
-        genai.configure(api_key=api_key)
+        response = requests.post(url, headers=headers, json=data)
         
-        # Kita coba model terbaru dulu
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(prompt)
-            return response.text
-        except:
-            # Jika server masih jadul, kita pakai model cadangan (legacy)
-            model = genai.GenerativeModel('gemini-pro')
-            response = model.generate_content(prompt)
-            return response.text
-            
+        if response.status_code == 200:
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        else:
+            # Jika 1.5-flash gagal, coba fallback ke gemini-pro (backup)
+            url_backup = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
+            response_backup = requests.post(url_backup, headers=headers, json=data)
+            if response_backup.status_code == 200:
+                return response_backup.json()['candidates'][0]['content']['parts'][0]['text']
+            else:
+                return f"Error API: {response.text}"
+                
     except Exception as e:
-        return f"""
-        ❌ Terjadi Error: {str(e)}
-        
-        TIPS PERBAIKAN:
-        1. Jika di Localhost: Buka terminal, ketik 'pip install --upgrade google-generativeai'
-        2. Jika di Streamlit Cloud: Pastikan ada file 'requirements.txt' isinya 'google-generativeai>=0.5.0'
-        """
+        return f"Error Koneksi: {str(e)}"
 
 def create_docx(data):
     doc = Document()
@@ -250,8 +255,13 @@ def main_app():
 
     with st.sidebar:
         st.markdown("<div class='skeuo-card' style='text-align:center;'>⚙️ <b>KONFIGURASI</b></div>", unsafe_allow_html=True)
-        api_key = st.secrets["GEMINI_API_KEY"] if "GEMINI_API_KEY" in st.secrets else st.text_input("API Key", type="password")
-        if api_key: st.success("✅ AI Ready")
+        # Ambil API KEY dari Secrets atau Input Manual
+        if "GEMINI_API_KEY" in st.secrets:
+            api_key = st.secrets["GEMINI_API_KEY"]
+            st.success("✅ AI Ready (Cloud)")
+        else:
+            api_key = st.text_input("API Key", type="password")
+            if api_key: st.success("✅ AI Ready")
         
         st.divider()
         st.write("<b>Identitas Sekolah:</b>", unsafe_allow_html=True)
@@ -401,7 +411,7 @@ def main_app():
         'cp': cp, 'topik': topik, 'model': model, 'tujuan': tujuan, 'pemantik': pemantik,
         'profil': profil, 'remedial': remedial, 'pengayaan': pengayaan,
         'bahan': bahan, 'lkpd': lkpd, 'media': media, 'soal': soal, 'kunci': kunci,
-        'teknik_nilai': teknik_nilai, # Baru
+        'teknik_nilai': teknik_nilai,
         'siswa_list': siswa_list, 'pustaka': pustaka, 'glosarium': glosarium, 
         'ref_guru': ref_guru, 'ref_siswa': ref_siswa
     }
@@ -423,6 +433,3 @@ if not st.session_state['logged_in']:
             if u=="guru" and p=="123": st.session_state['logged_in']=True; st.rerun()
             else: st.error("Gagal")
 else: main_app()
-
-
-
