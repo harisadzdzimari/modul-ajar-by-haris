@@ -105,15 +105,15 @@ def tanya_gemini(api_key, prompt):
         # Konfigurasi API Key
         genai.configure(api_key=api_key)
         
-        # GUNAKAN MODEL INI (Paling Stabil & Cepat)
-        # Jika 'gemini-1.5-flash' masih error, ganti jadi 'gemini-pro'
-        model = genai.GenerativeModel('gemini-1.5-flash') 
+        # SOLUSI ERROR 404:
+        # Kita pakai 'gemini-pro' karena ini model paling universal dan stabil.
+        # Jangan pakai 'flash' dulu jika library di server belum support.
+        model = genai.GenerativeModel('gemini-pro') 
         
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        # Pesan Error yang lebih jelas
-        return f"Error AI: {str(e)}. Coba refresh halaman atau cek API Key."
+        return f"Error AI: {str(e)}"
 
 def create_docx(data):
     doc = Document()
@@ -413,4 +413,5 @@ if not st.session_state['logged_in']:
             if u=="guru" and p=="123": st.session_state['logged_in']=True; st.rerun()
             else: st.error("Gagal")
 else: main_app()
+
 
