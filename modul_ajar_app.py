@@ -99,12 +99,21 @@ def render_header():
 # 3. FUNGSI LOGIKA (AI & DOKUMEN)
 # ==========================================
 def tanya_gemini(api_key, prompt):
-    if not api_key: return "⚠️ Masukkan API Key!"
+    if not api_key:
+        return "⚠️ Masukkan API Key di Sidebar terlebih dahulu!"
     try:
+        # Konfigurasi API Key
         genai.configure(api_key=api_key)
+        
+        # GUNAKAN MODEL INI (Paling Stabil & Cepat)
+        # Jika 'gemini-1.5-flash' masih error, ganti jadi 'gemini-pro'
         model = genai.GenerativeModel('gemini-1.5-flash') 
-        return model.generate_content(prompt).text
-    except Exception as e: return f"Error: {str(e)}"
+        
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        # Pesan Error yang lebih jelas
+        return f"Error AI: {str(e)}. Coba refresh halaman atau cek API Key."
 
 def create_docx(data):
     doc = Document()
@@ -404,3 +413,4 @@ if not st.session_state['logged_in']:
             if u=="guru" and p=="123": st.session_state['logged_in']=True; st.rerun()
             else: st.error("Gagal")
 else: main_app()
+
