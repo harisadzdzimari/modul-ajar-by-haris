@@ -221,8 +221,15 @@ def main_app():
             
         st.divider()
         st.header("🤖 Konfigurasi AI")
-        api_key = st.text_input("Gemini API Key", type="password", placeholder="Tempel API Key di sini")
-        st.info("💡 Tanpa API Key, fitur otomatis tidak berjalan.")
+        
+        # --- PERBAIKAN: OTOMATIS BACA SECRETS (GITHUB/CLOUD) ---
+        if "GEMINI_API_KEY" in st.secrets:
+            api_key = st.secrets["GEMINI_API_KEY"]
+            st.success("✅ Terhubung otomatis (Secrets Cloud)")
+        else:
+            api_key = st.text_input("Gemini API Key", type="password", placeholder="Tempel API Key di sini")
+            st.info("💡 Isi manual jika dijalankan di komputer lokal.")
+        # -------------------------------------------------------
 
         st.divider()
         st.header("⚙️ Identitas Sekolah")
@@ -268,8 +275,10 @@ def main_app():
             c_ai_tp1, c_ai_tp2 = st.columns([1, 3])
             with c_ai_tp1:
                 if st.button("✨ Bantu Buat Tujuan", help="Klik untuk membuat Tujuan Pembelajaran otomatis"):
-                    if not topik or not api_key:
-                        st.warning("Isi Topik & API Key dulu!")
+                    if not topik:
+                        st.warning("Isi Topik dulu!")
+                    elif not api_key:
+                        st.error("API Key belum terisi!")
                     else:
                         with st.spinner("AI sedang berpikir..."):
                             prompt = f"Buatkan 3 Tujuan Pembelajaran yang spesifik untuk mapel {mapel} topik {topik} kelas {kelas} SD menggunakan model {model}."
@@ -297,7 +306,8 @@ def main_app():
         c_ai_mat1, c_ai_mat2 = st.columns([1, 4])
         with c_ai_mat1:
             if st.button("✨ Bantu Buat Materi"):
-                if not topik or not api_key: st.warning("Isi Topik & API Key!")
+                if not topik: st.warning("Isi Topik dulu!")
+                elif not api_key: st.error("API Key kosong!")
                 else:
                     with st.spinner("Menulis materi..."):
                         prompt = f"Buatkan ringkasan materi bahan ajar seru dan mudah dipahami untuk anak {kelas} SD tentang {topik}."
@@ -317,7 +327,8 @@ def main_app():
     with t4:
         # --- AI BUTTON UNTUK SOAL ---
         if st.button("✨ Bantu Buat Soal & Kunci"):
-            if not topik or not api_key: st.warning("Isi Topik & API Key!")
+            if not topik: st.warning("Isi Topik dulu!")
+            elif not api_key: st.error("API Key kosong!")
             else:
                 with st.spinner("Membuat soal..."):
                     prompt_soal = f"Buatkan 5 soal essay pendek tentang {topik} untuk siswa {kelas} SD."
@@ -371,7 +382,7 @@ def main_app():
             st.subheader("🙋 Refleksi Siswa")
             ref_siswa = st.text_area("Pertanyaan Siswa:", value="1. Apa yang paling disukai?\n2. Apa yang belum paham?")
 
-    # --- TOMBOL GENERATE (BAGIAN BARU) ---
+    # --- TOMBOL GENERATE ---
     st.markdown("---")
     st.success("✅ Data Siap Diunduh")
     
