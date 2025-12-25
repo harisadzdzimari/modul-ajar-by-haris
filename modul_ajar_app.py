@@ -399,17 +399,62 @@ def main_app():
         with c_dif2: pengayaan = st.text_area("Pengayaan:", value="Tugas proyek tambahan.")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with t3:
+with t3:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
-        if st.button("✨ Auto Materi & Soal"):
-            if not topik: st.warning("Isi Topik!")
+        st.subheader("🛠️ Generator Bahan Ajar")
+        
+        # --- FITUR BARU: MENU PILIHAN ---
+        st.write("Pilih komponen yang ingin dibuatkan AI:")
+        col_opt1, col_opt2 = st.columns(2)
+        with col_opt1:
+            inc_lkpd = st.checkbox("✅ Buat LKPD Otomatis", value=True)
+            inc_rubrik = st.checkbox("✅ Buat Rubrik Penilaian", value=True)
+        with col_opt2:
+            inc_glosarium = st.checkbox("✅ Sertakan Glosarium", value=False)
+            inc_media = st.checkbox("✅ Ide Media Pembelajaran", value=False)
+        
+        st.divider()
+
+        # Tombol Generate dengan Logika Baru
+        if st.button("✨ Generate Bahan Ajar Lengkap"):
+            if not topik: 
+                st.warning("⚠️ Harap isi 'Topik Materi' di Tab 2 terlebih dahulu!")
             else:
-                with st.spinner("AI Menulis..."):
-                    st.session_state['bahan'] = tanya_gemini(api_key, f"Ringkasan materi {topik} SD kelas {kelas}.")
-                    st.session_state['soal'] = tanya_gemini(api_key, f"5 soal essay {topik} dan kunci jawaban.")
-        bahan = st.text_area("Bahan Ajar:", value=st.session_state.get('bahan', ''), height=150)
-        lkpd = st.text_area("Instruksi LKPD:")
-        soal = st.text_area("Soal & Kunci:", value=st.session_state.get('soal', ''), height=150)
+                with st.spinner("⏳ AI sedang menyusun materi, LKPD, dan soal..."):
+                    
+                    # 1. PROMPT MATERI (Ditambah Glosarium & Media jika dipilih)
+                    prompt_materi = f"Buatkan Ringkasan materi {topik} untuk siswa SD kelas {kelas} dengan bahasa yang mudah dipahami."
+                    if inc_glosarium:
+                        prompt_materi += "\n- Tambahkan bagian 'Glosarium' untuk istilah-istilah sulit."
+                    if inc_media:
+                        prompt_materi += "\n- Berikan 3 ide media pembelajaran kreatif/alat peraga sederhana untuk materi ini."
+                    
+                    st.session_state['bahan'] = tanya_gemini(api_key, prompt_materi)
+
+                    # 2. PROMPT LKPD (Jika dicentang)
+                    if inc_lkpd:
+                        prompt_lkpd = f"Buatkan rancangan Lembar Kerja Peserta Didik (LKPD) untuk topik {topik} kelas {kelas}. Berikan instruksi langkah demi langkah aktivitas siswa yang menarik."
+                        st.session_state['lkpd_ai'] = tanya_gemini(api_key, prompt_lkpd)
+                    else:
+                        st.session_state['lkpd_ai'] = ""
+
+                    # 3. PROMPT SOAL & RUBRIK
+                    prompt_soal = f"Buatkan 5 soal essay HOTS tentang {topik} beserta kunci jawabannya."
+                    if inc_rubrik:
+                        prompt_soal += "\n- Sertakan tabel Rubrik Penilaian untuk soal tersebut (Skor 4,3,2,1)."
+                    
+                    st.session_state['soal'] = tanya_gemini(api_key, prompt_soal)
+                    
+                    st.success("Selesai! Silakan cek kolom di bawah.")
+
+        # Menampilkan Hasil (Mengambil dari Session State)
+        bahan = st.text_area("📚 Bahan Ajar & Materi:", value=st.session_state.get('bahan', ''), height=200)
+        
+        # Kolom LKPD sekarang otomatis terisi jika AI generate
+        lkpd = st.text_area("📝 Instruksi LKPD:", value=st.session_state.get('lkpd_ai', ''), height=150)
+        
+        soal = st.text_area("❓ Soal, Kunci & Rubrik:", value=st.session_state.get('soal', ''), height=200)
+        
         st.markdown("</div>", unsafe_allow_html=True)
 
     with t4:
@@ -471,7 +516,5 @@ if __name__ == "__main__":
     if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
     if not st.session_state['logged_in']: login_page()
     else: main_app()
-
-
 
 
