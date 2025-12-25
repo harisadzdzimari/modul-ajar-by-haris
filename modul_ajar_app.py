@@ -35,6 +35,13 @@ st.markdown("""
         color: #333 !important; padding: 10px;
     }
     
+    /* Multiselect Tag Style */
+    .stMultiSelect span[data-baseweb="tag"] {
+        background-color: #e0e5ec !important;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+    }
+
     /* Button Style */
     .stButton>button {
         width: 100%; border: none; outline: none; border-radius: 12px;
@@ -62,8 +69,8 @@ st.markdown("""
     }
     
     /* Custom Titles */
-    h3 { color: #0d47a1; font-weight: bold; }
-    h4 { color: #333; font-weight: bold; margin-bottom: 10px; }
+    h3 { color: #0d47a1; font-weight: bold; margin-bottom: 15px; }
+    h4 { color: #333; font-weight: bold; margin-bottom: 10px; font-size: 16px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -85,7 +92,7 @@ def render_header():
             }
             setInterval(updateTime, 1000); updateTime();
         </script>
-        <div style="text-align:center; padding:10px; color:#555; font-size:12px;">Aplikasi by Haris Adz Dzimari</div>
+        <div style="text-align:center; padding:10px; color:#555; font-size:12px; margin-bottom:10px;">Aplikasi by Haris Adz Dzimari</div>
     """, unsafe_allow_html=True)
 
 # ==========================================
@@ -157,21 +164,38 @@ def create_docx(data):
     doc.add_heading('A. Soal Latihan', 2); doc.add_paragraph(data['soal'])
     doc.add_heading('B. Kunci Jawaban', 2); doc.add_paragraph(data['kunci'])
 
-    # V. ABSENSI
-    doc.add_page_break(); doc.add_heading('V. DAFTAR HADIR', 1)
+    # V. ASESMEN & RUBRIK
+    doc.add_heading('V. ASESMEN', 1)
+    doc.add_paragraph(f"Teknik Penilaian: {', '.join(data['teknik_nilai'])}")
+    
+    doc.add_heading('Rubrik Penilaian Sikap (Profil Pelajar)', 2)
+    t_rubrik = doc.add_table(rows=1, cols=5); t_rubrik.style = 'Table Grid'
+    rh = t_rubrik.rows[0].cells
+    rh[0].text="Dimensi"; rh[1].text="Membudaya (4)"; rh[2].text="Berkembang (3)"; rh[3].text="Mulai Terlihat (2)"; rh[4].text="Belum Terlihat (1)"
+    for dim in data['profil']:
+        rr = t_rubrik.add_row().cells
+        rr[0].text = dim
+        rr[1].text = "Sangat konsisten menunjukkan sikap ini."
+        rr[2].text = "Konsisten menunjukkan sikap ini."
+        rr[3].text = "Mulai menunjukkan sikap ini."
+        rr[4].text = "Belum menunjukkan sikap ini."
+
+    # VI. DAFTAR HADIR
+    doc.add_page_break(); doc.add_heading('VI. DAFTAR HADIR SISWA', 1)
     doc.add_paragraph(f"Kelas: {data['kelas']} | Tanggal: {data['tanggal'].strftime('%d-%m-%Y')}")
+    
     t_absen = doc.add_table(rows=1, cols=5); t_absen.style = 'Table Grid'
-    hdr = t_absen.rows[0].cells; hdr[0].text="No"; hdr[1].text="Nama"; hdr[2].text="Hadir"; hdr[3].text="Ket"
+    hdr = t_absen.rows[0].cells; hdr[0].text="No"; hdr[1].text="Nama Siswa"; hdr[2].text="Hadir"; hdr[3].text="Sakit/Izin"; hdr[4].text="Ket"
     siswa = data['siswa_list'] if data['siswa_list'] else [""]*25
     for i, nm in enumerate(siswa):
         r = t_absen.add_row().cells; r[0].text=str(i+1); r[1].text=nm.strip()
 
-    # VI. LAMPIRAN
-    doc.add_paragraph("\n"); doc.add_heading('VI. LAMPIRAN', 1)
+    # VII. LAMPIRAN
+    doc.add_paragraph("\n"); doc.add_heading('VII. LAMPIRAN', 1)
     doc.add_heading('Daftar Pustaka', 2); doc.add_paragraph(data['pustaka'])
     doc.add_heading('Glosarium', 2); doc.add_paragraph(data['glosarium'])
     
-    # VII. REFLEKSI
+    # VIII. REFLEKSI
     doc.add_heading('Refleksi', 1)
     doc.add_heading('Refleksi Guru', 2); doc.add_paragraph(data['ref_guru'])
     doc.add_heading('Refleksi Siswa', 2); doc.add_paragraph(data['ref_siswa'])
@@ -193,9 +217,9 @@ def create_pdf(data):
     pdf.cell(0, 8, safe(f"Sekolah: {data['sekolah']}"), ln=True)
     pdf.cell(0, 8, safe(f"Guru: {data['guru']}"), ln=True)
     pdf.ln(5)
-    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 8, "TUJUAN & PROFIL:", ln=True)
+    pdf.set_font("Arial", 'B', 11); pdf.cell(0, 8, "TUJUAN & TEKNIK PENILAIAN:", ln=True)
     pdf.set_font("Arial", size=11); pdf.multi_cell(0, 6, safe(data['tujuan'])); pdf.ln(3)
-    pdf.multi_cell(0, 6, safe(f"Profil: {', '.join(data['profil'])}")); pdf.ln(3)
+    pdf.multi_cell(0, 6, safe(f"Teknik Penilaian: {', '.join(data['teknik_nilai'])}")); pdf.ln(3)
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 # ==========================================
@@ -219,11 +243,9 @@ def main_app():
         
         if st.button("Logout"): st.session_state['logged_in'] = False; st.rerun()
 
-    # --- TABS UTAMA ---
     t1, t2, t3, t4, t5, t6, t7 = st.tabs(["1️⃣ Identitas", "2️⃣ Inti", "3️⃣ Bahan & LKPD", "4️⃣ Evaluasi", "5️⃣ Asesmen", "6️⃣ Glosarium", "7️⃣ Refleksi"])
 
-    # --- TAB 1: IDENTITAS ---
-    with t1:
+    with t1: # Identitas
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1: 
@@ -234,56 +256,37 @@ def main_app():
             fase = st.selectbox("Fase", ["Fase A (Kls 1-2)", "Fase B (Kls 3-4)", "Fase C (Kls 5-6)"])
             kelas = st.selectbox("Kelas", ["1","2","3","4","5","6"])
             alokasi = st.text_input("Alokasi Waktu", value="2 JP (2 x 35 Menit)")
-        
-        cp = st.text_area("Capaian Pembelajaran (CP):", height=100, placeholder="Peserta didik mampu...")
+        cp = st.text_area("Capaian Pembelajaran (CP):", height=100)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- TAB 2: KOMPONEN INTI (LAYOUT SPLIT) ---
-    with t2:
+    with t2: # Inti
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         col_inti_1, col_inti_2 = st.columns(2)
         
-        # KOLOM KIRI: MATERI & TUJUAN
         with col_inti_1:
             st.markdown("### 📚 Materi & Tujuan")
             topik = st.text_input("Topik / Bab")
-            model = st.selectbox("Model Pembelajaran", [
-                "Problem-Based Learning (PBL)", 
-                "Project-Based Learning (PjBL)", 
-                "Discovery Learning (DL)", 
-                "Inquiry Learning (IL)"
-            ])
-            
+            model = st.selectbox("Model Pembelajaran", ["Problem-Based Learning (PBL)", "Project-Based Learning (PjBL)", "Discovery Learning (DL)", "Inquiry Learning (IL)"])
             if st.button("✨ Bantu Buat Tujuan"):
                 if not api_key: st.error("API Key Kosong")
                 else:
                     with st.spinner("AI Bekerja..."):
                         p = f"Buatkan tujuan pembelajaran (TP) dan pertanyaan pemantik untuk mapel {mapel} topik {topik} fase {fase} model {model}."
                         st.session_state['tujuan_ai'] = tanya_gemini(api_key, p)
-            
             tujuan = st.text_area("Tujuan Pembelajaran (TP)", value=st.session_state.get('tujuan_ai', ''), height=150)
             pemantik = st.text_input("Pertanyaan Pemantik", placeholder="Mengapa kita perlu...?")
 
-        # KOLOM KANAN: PROFIL & DIFERENSIASI
         with col_inti_2:
             st.markdown("### 👤 Profil & Diferensiasi")
             st.write("8 Dimensi Profil:")
-            profil_opsi = [
-                "Keimanan & Ketakwaan", "Kewargaan", "Penalaran Kritis", 
-                "Kreativitas", "Kolaborasi", "Kemandirian", 
-                "Kesehatan (Fisik & Mental)", "Komunikasi"
-            ]
+            profil_opsi = ["Keimanan & Ketakwaan", "Kewargaan", "Penalaran Kritis", "Kreativitas", "Kolaborasi", "Kemandirian", "Kesehatan (Fisik & Mental)", "Komunikasi"]
             profil = st.multiselect("Pilih Dimensi", profil_opsi, default=["Penalaran Kritis", "Kreativitas"], label_visibility="collapsed")
-            
             st.divider()
-            
             remedial = st.text_area("Remedial:", value="Pendampingan individu dan penyederhanaan materi.", height=80)
             pengayaan = st.text_area("Pengayaan:", value="Tugas proyek tambahan atau tutor sebaya.", height=80)
-        
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- TAB 3: BAHAN & LKPD ---
-    with t3:
+    with t3: # Bahan & LKPD
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         if st.button("✨ Auto Materi & LKPD"):
              if not api_key: st.error("API Key Kosong")
@@ -292,18 +295,15 @@ def main_app():
                     st.session_state['materi_ai'] = tanya_gemini(api_key, f"Ringkasan materi {topik} SD kelas {kelas}.")
                     st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan petunjuk LKPD aktivitas siswa topik {topik}.")
                     st.session_state['media_ai'] = tanya_gemini(api_key, f"List media ajar untuk topik {topik}.")
-        
         st.markdown("#### 📖 Ringkasan Bahan Ajar")
         bahan = st.text_area("Materi:", value=st.session_state.get('materi_ai', ''), height=200)
-        
         st.divider()
         st.markdown("#### 📝 Desain LKPD & Media")
         lkpd = st.text_area("Petunjuk LKPD:", value=st.session_state.get('lkpd_ai', ''), height=200)
         media = st.text_area("Media Ajar:", value=st.session_state.get('media_ai', ''), height=80)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- TAB 4: EVALUASI (SPLIT) ---
-    with t4:
+    with t4: # Evaluasi
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         if st.button("✨ Auto Soal & Kunci"):
              if not api_key: st.error("API Key Kosong")
@@ -311,7 +311,6 @@ def main_app():
                  with st.spinner("Membuat Soal..."):
                      st.session_state['soal_ai'] = tanya_gemini(api_key, f"Buatkan 5 Soal Essay HOTS tentang {topik}.")
                      st.session_state['kunci_ai'] = tanya_gemini(api_key, f"Buatkan Kunci Jawaban untuk soal essay topik {topik}.")
-        
         c_ev1, c_ev2 = st.columns(2)
         with c_ev1:
             st.markdown("#### ❓ Soal Latihan")
@@ -321,24 +320,49 @@ def main_app():
             kunci = st.text_area("Kunci Jawaban:", value=st.session_state.get('kunci_ai', ''), height=250)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- TAB 5: ASESMEN ---
-    with t5:
+    with t5: # Asesmen
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
-        st.info("Ketik nama siswa (1 nama per baris) untuk mengisi Tabel Absensi otomatis.")
+        st.info("ℹ️ Bagian ini akan menghasilkan tabel Rubrik Penilaian di file akhir.")
+        
+        # 1. Teknik Penilaian (Multiselect)
+        st.write("Teknik Penilaian:")
+        teknik_nilai = st.multiselect("Pilih Teknik", ["Tes Tulis", "Lisan", "Observasi", "Unjuk Kerja", "Portofolio", "Proyek"], default=["Tes Tulis", "Observasi"], label_visibility="collapsed")
+        
+        # 2. Preview Rubrik
+        st.divider()
+        st.write("Preview Rubrik Sikap (Otomatis berdasarkan Profil di Tab 2):")
+        
+        # Bikin Dataframe untuk Preview
+        if profil:
+            data_rubrik = []
+            for p in profil:
+                data_rubrik.append({
+                    "Dimensi": p,
+                    "Skor 4": "Membudaya",
+                    "Skor 3": "Berkembang",
+                    "Skor 2": "Mulai Terlihat",
+                    "Skor 1": "Belum Terlihat"
+                })
+            df_rubrik = pd.DataFrame(data_rubrik)
+            st.table(df_rubrik)
+        else:
+            st.warning("⚠️ Belum ada Dimensi Profil yang dipilih di Tab 2 (Komponen Inti).")
+
+        # 3. Input Siswa
+        st.divider()
+        st.write("Ketik nama siswa (1 nama per baris) untuk mengisi Tabel Absensi otomatis:")
         raw_siswa = st.text_area("Daftar Nama Siswa:", height=150, placeholder="Adi\nBudi\nCici...")
         siswa_list = [x for x in raw_siswa.split('\n') if x.strip()]
         st.write(f"Terdeteksi: **{len(siswa_list)} Siswa**")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- TAB 6: GLOSARIUM ---
-    with t6:
+    with t6: # Glosarium
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         pustaka = st.text_area("📚 Daftar Pustaka:", value=f"1. Buku Paket Kemdikbud Kelas {kelas}", height=100)
         glosarium = st.text_area("🔤 Glosarium:", placeholder="Istilah sulit...", height=100)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- TAB 7: REFLEKSI ---
-    with t7:
+    with t7: # Refleksi
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         c_ref1, c_ref2 = st.columns(2)
         with c_ref1:
@@ -358,6 +382,7 @@ def main_app():
         'cp': cp, 'topik': topik, 'model': model, 'tujuan': tujuan, 'pemantik': pemantik,
         'profil': profil, 'remedial': remedial, 'pengayaan': pengayaan,
         'bahan': bahan, 'lkpd': lkpd, 'media': media, 'soal': soal, 'kunci': kunci,
+        'teknik_nilai': teknik_nilai, # Baru
         'siswa_list': siswa_list, 'pustaka': pustaka, 'glosarium': glosarium, 
         'ref_guru': ref_guru, 'ref_siswa': ref_siswa
     }
