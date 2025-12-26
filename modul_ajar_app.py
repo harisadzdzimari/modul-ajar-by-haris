@@ -279,24 +279,24 @@ def main_app():
     
     # Ambil statistik
     logins, gens = manage_stats() 
-    # Tanggal hari ini
+    # WAKTU & TANGGAL
     today_date = datetime.date.today().strftime("%d %B %Y")
+    now_time = datetime.datetime.now().strftime("%H:%M WIB")
 
     st.markdown("<div class='skeuo-card' style='text-align:center;'><h1 style='color:#0d47a1; margin:0;'>💎 GENERATOR MODUL AJAR</h1></div>", unsafe_allow_html=True)
 
     with st.sidebar:
         st.markdown("<div class='skeuo-card' style='text-align:center;'>⚙️ <b>KONFIGURASI</b></div>", unsafe_allow_html=True)
         
-        # --- STATISTIK HARI INI (UPDATE: ADA TANGGAL) ---
+        # --- STATISTIK LENGKAP (TANGGAL & JAM) ---
         st.markdown(f"""
         <div style='background:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:15px; text-align:center;'>
             <h4 style='margin:0;'>📊 Statistik Hari Ini</h4>
-            <p style='font-size:12px; margin-bottom:5px;'>{today_date}</p>
+            <p style='font-size:12px; margin-bottom:5px; color:#555;'>{today_date} | {now_time}</p>
             <p style='margin:0;'>Login: <b>{logins}</b> | Modul: <b>{gens}</b></p>
         </div>
         """, unsafe_allow_html=True)
         
-        # API Key (Hanya Input Manual, Cloud Error Dihapus)
         api_key = st.text_input("Tempel API Key Gemini", type="password")
         if api_key: st.success("✅ AI Siap Digunakan")
         
@@ -337,7 +337,7 @@ def main_app():
                 if not api_key: st.error("API Key Kosong")
                 else:
                     with st.spinner("AI Bekerja..."):
-                        manage_stats('generate') # Catat statistik generate
+                        manage_stats('generate') 
                         p = f"Buatkan tujuan pembelajaran (TP) dan pertanyaan pemantik untuk mapel {mapel} topik {topik} fase {fase} model {model}."
                         st.session_state['tujuan_ai'] = tanya_gemini(api_key, p)
                         st.rerun()
@@ -360,7 +360,7 @@ def main_app():
              if not api_key: st.error("API Key Kosong")
              else:
                 with st.spinner("Menyusun..."):
-                    manage_stats('generate') # Catat statistik generate
+                    manage_stats('generate') 
                     st.session_state['materi_ai'] = tanya_gemini(api_key, f"Ringkasan materi {topik} SD kelas {kelas}.")
                     st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan petunjuk LKPD aktivitas siswa topik {topik}.")
                     st.session_state['media_ai'] = tanya_gemini(api_key, f"List media ajar untuk topik {topik}.")
@@ -379,7 +379,7 @@ def main_app():
              if not api_key: st.error("API Key Kosong")
              else:
                  with st.spinner("Membuat Soal..."):
-                     manage_stats('generate') # Catat statistik generate
+                     manage_stats('generate') 
                      st.session_state['soal_ai'] = tanya_gemini(api_key, f"Buatkan 5 Soal Essay HOTS tentang {topik}.")
                      st.session_state['kunci_ai'] = tanya_gemini(api_key, f"Buatkan Kunci Jawaban untuk soal essay topik {topik}.")
                      st.rerun()
@@ -464,7 +464,7 @@ if not st.session_state['logged_in']:
         u = st.text_input("User"); p = st.text_input("Pass", type="password")
         if st.button("MASUK"): 
             if u=="guru" and p=="123": 
-                manage_stats('login') # Catat statistik login
+                manage_stats('login') 
                 st.session_state['logged_in']=True
                 st.rerun()
             else: st.error("Gagal")
