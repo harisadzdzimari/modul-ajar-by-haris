@@ -25,7 +25,6 @@ def get_jakarta_time():
     return jakarta_time
 
 def manage_stats(action=None):
-    # Gunakan waktu Jakarta
     now_jakarta = get_jakarta_time()
     today_str = now_jakarta.strftime("%Y-%m-%d")
     
@@ -46,7 +45,9 @@ def manage_stats(action=None):
         
     df.to_csv(STATS_FILE, index=False)
     today_data = df.loc[df['date'] == today_str].iloc[0]
-    return today_data['login_count'], today_data['gen_count']
+    
+    # Return data hari ini & DataFrame lengkap untuk grafik
+    return today_data['login_count'], today_data['gen_count'], df
 
 # ==========================================
 # 2. CSS SKEUOMORPHISM & STYLE
@@ -285,8 +286,8 @@ def create_pdf(data):
 def main_app():
     render_header()
     
-    # Ambil statistik & Waktu (GMT+7)
-    logins, gens = manage_stats() 
+    # Ambil statistik & DataFrame (untuk grafik)
+    logins, gens, df_stats = manage_stats() 
     
     # WAKTU & TANGGAL (GMT+7 MANUAL FIX)
     utc_now = datetime.datetime.utcnow()
@@ -299,7 +300,7 @@ def main_app():
     with st.sidebar:
         st.markdown("<div class='skeuo-card' style='text-align:center;'>⚙️ <b>KONFIGURASI</b></div>", unsafe_allow_html=True)
         
-        # --- STATISTIK LENGKAP (TANGGAL & JAM) ---
+        # --- 1. STATISTIK LENGKAP (TANGGAL & JAM) ---
         st.markdown(f"""
         <div style='background:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:15px; text-align:center;'>
             <h4 style='margin:0;'>📊 Statistik Hari Ini</h4>
@@ -308,12 +309,27 @@ def main_app():
         </div>
         """, unsafe_allow_html=True)
         
+        # --- 2. FITUR BARU: GRAFIK TREN (CHART) ---
+        st.write("**Tren Pembuatan Modul (7 Hari)**")
+        if not df_stats.empty:
+            chart_data = df_stats.tail(7).set_index('date')['gen_count']
+            st.bar_chart(chart_data)
+
         # LOGIKA API KEY (OTOMATIS DARI SECRETS)
         if "GEMINI_API_KEY" in st.secrets:
             api_key = st.secrets["GEMINI_API_KEY"]
         else:
             api_key = "" 
         
+        # --- 3. FITUR BARU: TOMBOL RESET ---
+        if st.button("🔄 Buat Modul Baru (Reset)"):
+            # Hapus session state tertentu
+            keys_to_reset = ['tujuan_ai', 'materi_ai', 'lkpd_ai', 'media_ai', 'soal_ai', 'kunci_ai']
+            for k in keys_to_reset:
+                if k in st.session_state:
+                    del st.session_state[k]
+            st.rerun()
+
         st.divider()
         st.write("<b>Identitas Sekolah:</b>", unsafe_allow_html=True)
         uploaded_logo = st.file_uploader("Upload Logo", type=['png', 'jpg', 'jpeg'])
@@ -323,9 +339,22 @@ def main_app():
         
         if st.button("Logout"): 
             st.session_state['logged_in'] = False
-            # Hapus Query Param saat logout
             st.query_params.clear()
             st.rerun()
+            
+        # --- 4. FITUR BARU: RIWAYAT MODUL (HISTORY) ---
+        st.divider()
+        st.write("📜 **Riwayat Sesi Ini:**")
+        if 'history' not in st.session_state: st.session_state['history'] = []
+        
+        if st.session_state['history']:
+            for i, h in enumerate(reversed(st.session_state['history'])):
+                with st.expander(f"{h['topik']} ({h['waktu']})"):
+                    if st.button("Muat Ulang", key=f"load_{i}"):
+                        st.session_state.update(h['data'])
+                        st.rerun()
+        else:
+            st.caption("Belum ada modul dibuat.")
 
     t1, t2, t3, t4, t5, t6, t7 = st.tabs(["1️⃣ Identitas", "2️⃣ Inti", "3️⃣ Bahan & LKPD", "4️⃣ Evaluasi", "5️⃣ Asesmen", "6️⃣ Glosarium", "7️⃣ Refleksi"])
 
@@ -333,9 +362,9 @@ def main_app():
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1: 
-            nama_guru = st.text_input("Nama Guru", placeholder="Nama Lengkap")
+            nama_guru = st.text_input("Nama Guru", value=st.session_state.get('nama_guru', ''), placeholder="Nama Lengkap")
             tanggal = st.date_input("Tanggal")
-            mapel = st.text_input("Mapel", placeholder="Informatika")
+            mapel = st.text_input("Mapel", value=st.session_state.get('mapel', ''), placeholder="Informatika")
         with c2: 
             fase = st.selectbox("Fase", ["Fase A (Kls 1-2)", "Fase B (Kls 3-4)", "Fase C (Kls 5-6)"])
             kelas = st.selectbox("Kelas", ["1","2","3","4","5","6"])
@@ -349,7 +378,7 @@ def main_app():
         
         with col_inti_1:
             st.markdown("### 📚 Materi & Tujuan")
-            topik = st.text_input("Topik / Bab")
+            topik = st.text_input("Topik / Bab", value=st.session_state.get('topik', ''))
             model = st.selectbox("Model Pembelajaran", ["Problem-Based Learning (PBL)", "Project-Based Learning (PjBL)", "Discovery Learning (DL)", "Inquiry Learning (IL)"])
             if st.button("✨ Bantu Buat Tujuan"):
                 if not api_key: st.error("API Key Kosong/Salah di secrets.toml")
@@ -382,7 +411,23 @@ def main_app():
                     st.session_state['materi_ai'] = tanya_gemini(api_key, f"Ringkasan materi {topik} SD kelas {kelas}.")
                     st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan petunjuk LKPD aktivitas siswa topik {topik}.")
                     st.session_state['media_ai'] = tanya_gemini(api_key, f"List media ajar untuk topik {topik}.")
+                    
+                    # SIMPAN KE HISTORY
+                    hist_data = {
+                        'waktu': now_time,
+                        'topik': topik,
+                        'data': {
+                            'tujuan_ai': st.session_state.get('tujuan_ai', ''),
+                            'materi_ai': st.session_state['materi_ai'],
+                            'lkpd_ai': st.session_state['lkpd_ai'],
+                            'media_ai': st.session_state['media_ai'],
+                            'topik': topik,
+                            'mapel': mapel
+                        }
+                    }
+                    st.session_state['history'].append(hist_data)
                     st.rerun()
+
         st.markdown("#### 📖 Ringkasan Bahan Ajar")
         bahan = st.text_area("Materi:", value=st.session_state.get('materi_ai', ''), height=200)
         st.divider()
@@ -473,7 +518,6 @@ def main_app():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # LOGIN & SESSION MANAGEMENT
-# Cek apakah ada query param 'auth' (tanda sudah login)
 if "auth" in st.query_params and st.query_params["auth"] == "true":
     st.session_state['logged_in'] = True
 
@@ -490,7 +534,6 @@ if not st.session_state['logged_in']:
             if u=="guru" and p=="123": 
                 manage_stats('login') 
                 st.session_state['logged_in'] = True
-                # Set query param agar tahan refresh
                 st.query_params["auth"] = "true"
                 st.rerun()
             else: st.error("Gagal")
