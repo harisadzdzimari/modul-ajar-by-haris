@@ -19,34 +19,24 @@ st.set_page_config(page_title="Sistem Modul Ajar Sultan AI", layout="wide", page
 STATS_FILE = "daily_stats.csv"
 
 def manage_stats(action=None):
-    """
-    Fungsi untuk mencatat Login dan Generasi Modul harian.
-    action: 'login' atau 'generate' atau None (hanya baca)
-    """
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     
-    # 1. Cek apakah file ada, jika tidak buat baru
     if not os.path.exists(STATS_FILE):
         df = pd.DataFrame(columns=["date", "login_count", "gen_count"])
         df.to_csv(STATS_FILE, index=False)
     
     df = pd.read_csv(STATS_FILE)
     
-    # 2. Cek apakah hari ini sudah ada datanya
     if today_str not in df['date'].values:
         new_row = pd.DataFrame({"date": [today_str], "login_count": [0], "gen_count": [0]})
         df = pd.concat([df, new_row], ignore_index=True)
     
-    # 3. Update Data
     if action == 'login':
         df.loc[df['date'] == today_str, 'login_count'] += 1
     elif action == 'generate':
         df.loc[df['date'] == today_str, 'gen_count'] += 1
         
-    # Simpan kembali
     df.to_csv(STATS_FILE, index=False)
-    
-    # Return data hari ini untuk ditampilkan
     today_data = df.loc[df['date'] == today_str].iloc[0]
     return today_data['login_count'], today_data['gen_count']
 
@@ -146,8 +136,6 @@ def render_header():
 # ==========================================
 # 4. FUNGSI LOGIKA (AI DIRECT API & DOKUMEN)
 # ==========================================
-
-# MENGGUNAKAN REST API LANGSUNG (ANTI ERROR 404)
 def tanya_gemini(api_key, prompt):
     if not api_key: return "⚠️ Masukkan API Key!"
     
@@ -160,7 +148,6 @@ def tanya_gemini(api_key, prompt):
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            # Fallback ke gemini-pro jika flash gagal
             url_backup = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
             response_backup = requests.post(url_backup, headers=headers, json=data)
             if response_backup.status_code == 200:
@@ -174,7 +161,6 @@ def create_docx(data):
     doc = Document()
     for s in doc.sections: s.top_margin = s.bottom_margin = s.left_margin = s.right_margin = Cm(2.54)
 
-    # HEADER DENGAN LOGO
     if data['logo']:
         try:
             doc.add_picture(data['logo'], width=Inches(1.0))
@@ -212,7 +198,6 @@ def create_docx(data):
     doc.add_heading('A. Tujuan Pembelajaran', 2); doc.add_paragraph(data['tujuan'])
     doc.add_heading('B. Pertanyaan Pemantik', 2); doc.add_paragraph(data['pemantik'])
     
-    # Diferensiasi
     doc.add_heading('C. Diferensiasi', 2)
     doc.add_paragraph(f"Remedial: {data['remedial']}")
     doc.add_paragraph(f"Pengayaan: {data['pengayaan']}")
@@ -292,29 +277,28 @@ def create_pdf(data):
 def main_app():
     render_header()
     
-    # Ambil statistik hari ini
+    # Ambil statistik
     logins, gens = manage_stats() 
+    # Tanggal hari ini
+    today_date = datetime.date.today().strftime("%d %B %Y")
 
     st.markdown("<div class='skeuo-card' style='text-align:center;'><h1 style='color:#0d47a1; margin:0;'>💎 GENERATOR MODUL AJAR</h1></div>", unsafe_allow_html=True)
 
     with st.sidebar:
         st.markdown("<div class='skeuo-card' style='text-align:center;'>⚙️ <b>KONFIGURASI</b></div>", unsafe_allow_html=True)
         
-        # --- STATISTIK HARI INI ---
+        # --- STATISTIK HARI INI (UPDATE: ADA TANGGAL) ---
         st.markdown(f"""
         <div style='background:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:15px; text-align:center;'>
             <h4 style='margin:0;'>📊 Statistik Hari Ini</h4>
+            <p style='font-size:12px; margin-bottom:5px;'>{today_date}</p>
             <p style='margin:0;'>Login: <b>{logins}</b> | Modul: <b>{gens}</b></p>
         </div>
         """, unsafe_allow_html=True)
         
-        # API Key
-        if "GEMINI_API_KEY" in st.secrets:
-            api_key = st.secrets["GEMINI_API_KEY"]
-            st.success("✅ AI Ready (Cloud)")
-        else:
-            api_key = st.text_input("API Key", type="password")
-            if api_key: st.success("✅ AI Ready")
+        # API Key (Hanya Input Manual, Cloud Error Dihapus)
+        api_key = st.text_input("Tempel API Key Gemini", type="password")
+        if api_key: st.success("✅ AI Siap Digunakan")
         
         st.divider()
         st.write("<b>Identitas Sekolah:</b>", unsafe_allow_html=True)
@@ -353,11 +337,10 @@ def main_app():
                 if not api_key: st.error("API Key Kosong")
                 else:
                     with st.spinner("AI Bekerja..."):
-                        # TRACKING GENERATE
-                        manage_stats('generate')
+                        manage_stats('generate') # Catat statistik generate
                         p = f"Buatkan tujuan pembelajaran (TP) dan pertanyaan pemantik untuk mapel {mapel} topik {topik} fase {fase} model {model}."
                         st.session_state['tujuan_ai'] = tanya_gemini(api_key, p)
-                        st.rerun() # Rerun untuk update counter
+                        st.rerun()
             tujuan = st.text_area("Tujuan Pembelajaran (TP)", value=st.session_state.get('tujuan_ai', ''), height=150)
             pemantik = st.text_input("Pertanyaan Pemantik", placeholder="Mengapa kita perlu...?")
 
@@ -377,7 +360,7 @@ def main_app():
              if not api_key: st.error("API Key Kosong")
              else:
                 with st.spinner("Menyusun..."):
-                    manage_stats('generate')
+                    manage_stats('generate') # Catat statistik generate
                     st.session_state['materi_ai'] = tanya_gemini(api_key, f"Ringkasan materi {topik} SD kelas {kelas}.")
                     st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan petunjuk LKPD aktivitas siswa topik {topik}.")
                     st.session_state['media_ai'] = tanya_gemini(api_key, f"List media ajar untuk topik {topik}.")
@@ -396,7 +379,7 @@ def main_app():
              if not api_key: st.error("API Key Kosong")
              else:
                  with st.spinner("Membuat Soal..."):
-                     manage_stats('generate')
+                     manage_stats('generate') # Catat statistik generate
                      st.session_state['soal_ai'] = tanya_gemini(api_key, f"Buatkan 5 Soal Essay HOTS tentang {topik}.")
                      st.session_state['kunci_ai'] = tanya_gemini(api_key, f"Buatkan Kunci Jawaban untuk soal essay topik {topik}.")
                      st.rerun()
@@ -481,8 +464,7 @@ if not st.session_state['logged_in']:
         u = st.text_input("User"); p = st.text_input("Pass", type="password")
         if st.button("MASUK"): 
             if u=="guru" and p=="123": 
-                # TRACKING LOGIN
-                manage_stats('login')
+                manage_stats('login') # Catat statistik login
                 st.session_state['logged_in']=True
                 st.rerun()
             else: st.error("Gagal")
