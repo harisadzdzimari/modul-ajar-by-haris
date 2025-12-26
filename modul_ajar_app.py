@@ -11,7 +11,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from fpdf import FPDF
 
 # --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Sistem Modul Ajar Sultan AI", layout="wide", page_icon="🏫")
+st.set_page_config(page_title="Sistem Administrasi Guru Sultan AI", layout="wide", page_icon="🏫")
 
 # ==========================================
 # 1. SISTEM PELACAKAN (TRACKER)
@@ -19,7 +19,6 @@ st.set_page_config(page_title="Sistem Modul Ajar Sultan AI", layout="wide", page
 STATS_FILE = "daily_stats.csv"
 
 def get_jakarta_time():
-    """Mengambil waktu server UTC lalu dikonversi ke WIB (UTC+7)"""
     utc_now = datetime.datetime.utcnow()
     jakarta_time = utc_now + datetime.timedelta(hours=7)
     return jakarta_time
@@ -45,8 +44,6 @@ def manage_stats(action=None):
         
     df.to_csv(STATS_FILE, index=False)
     today_data = df.loc[df['date'] == today_str].iloc[0]
-    
-    # Return data hari ini & DataFrame lengkap untuk grafik
     return today_data['login_count'], today_data['gen_count'], df
 
 # ==========================================
@@ -126,7 +123,7 @@ def render_header():
     st.markdown("""
         <div class="header-container">
             <div style="width: 65%; font-family: 'Courier New', monospace; font-weight: bold; color: #2c3e50; font-size: 16px;">
-                <marquee direction="left" scrollamount="6">🚀 SISTEM PERANGKAT AJAR TERPADU - SD MUHAMMADIYAH 8 TULANGAN 🚀</marquee>
+                <marquee direction="left" scrollamount="6">🚀 SISTEM ADMINISTRASI GURU TERPADU - SD MUHAMMADIYAH 8 TULANGAN 🚀</marquee>
             </div>
             <div id="clock" class="live-clock">Loading...</div>
         </div>
@@ -166,7 +163,18 @@ def tanya_gemini(api_key, prompt):
     except Exception as e:
         return f"Error Koneksi: {str(e)}"
 
-def create_docx(data):
+# FUNGSI EXPORT DOCX SEDERHANA UNTUK TEXT (ATP/PROTA)
+def create_simple_docx(title, content, sekolah):
+    doc = Document()
+    doc.add_heading(title, 0)
+    doc.add_paragraph(f"Sekolah: {sekolah}")
+    doc.add_paragraph("_"*50)
+    doc.add_paragraph(content)
+    buf = BytesIO(); doc.save(buf); buf.seek(0)
+    return buf
+
+# FUNGSI EXPORT DOCX MODUL AJAR (YANG LENGKAP)
+def create_modul_docx(data):
     doc = Document()
     for s in doc.sections: s.top_margin = s.bottom_margin = s.left_margin = s.right_margin = Cm(2.54)
 
@@ -281,84 +289,16 @@ def create_pdf(data):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 # ==========================================
-# 5. APLIKASI UTAMA
+# 5. HALAMAN FITUR (MODUL, ATP, PROTA)
 # ==========================================
-def main_app():
-    render_header()
+
+def menu_modul_ajar(api_key, nama_sekolah, alamat_sekolah, kepsek, uploaded_logo):
+    st.subheader("📂 Generator Modul Ajar")
     
-    # Ambil statistik & DataFrame (untuk grafik)
-    logins, gens, df_stats = manage_stats() 
-    
-    # WAKTU & TANGGAL (GMT+7 MANUAL FIX)
-    utc_now = datetime.datetime.utcnow()
-    jakarta_time = utc_now + datetime.timedelta(hours=7)
-    today_date = jakarta_time.strftime("%d %B %Y")
-    now_time = jakarta_time.strftime("%H:%M WIB")
-
-    st.markdown("<div class='skeuo-card' style='text-align:center;'><h1 style='color:#0d47a1; margin:0;'>💎 GENERATOR MODUL AJAR</h1></div>", unsafe_allow_html=True)
-
-    with st.sidebar:
-        st.markdown("<div class='skeuo-card' style='text-align:center;'>⚙️ <b>KONFIGURASI</b></div>", unsafe_allow_html=True)
-        
-        # --- 1. STATISTIK LENGKAP (TANGGAL & JAM) ---
-        st.markdown(f"""
-        <div style='background:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:15px; text-align:center;'>
-            <h4 style='margin:0;'>📊 Statistik Hari Ini</h4>
-            <p style='font-size:12px; margin-bottom:5px; color:#555;'>{today_date} | {now_time}</p>
-            <p style='margin:0;'>Login: <b>{logins}</b> | Modul: <b>{gens}</b></p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # --- 2. FITUR BARU: GRAFIK TREN (CHART) ---
-        st.write("**Tren Pembuatan Modul (7 Hari)**")
-        if not df_stats.empty:
-            chart_data = df_stats.tail(7).set_index('date')['gen_count']
-            st.bar_chart(chart_data)
-
-        # LOGIKA API KEY (OTOMATIS DARI SECRETS)
-        if "GEMINI_API_KEY" in st.secrets:
-            api_key = st.secrets["GEMINI_API_KEY"]
-        else:
-            api_key = "" 
-        
-        # --- 3. FITUR BARU: TOMBOL RESET ---
-        if st.button("🔄 Buat Modul Baru (Reset)"):
-            # Hapus session state tertentu
-            keys_to_reset = ['tujuan_ai', 'materi_ai', 'lkpd_ai', 'media_ai', 'soal_ai', 'kunci_ai']
-            for k in keys_to_reset:
-                if k in st.session_state:
-                    del st.session_state[k]
-            st.rerun()
-
-        st.divider()
-        st.write("<b>Identitas Sekolah:</b>", unsafe_allow_html=True)
-        uploaded_logo = st.file_uploader("Upload Logo", type=['png', 'jpg', 'jpeg'])
-        nama_sekolah = st.text_input("Sekolah", value="SD MUHAMMADIYAH 8 TULANGAN")
-        alamat_sekolah = st.text_area("Alamat", value="Jl. Raya Kenongo RT. 02 RW. 01 Tulangan Sidoarjo")
-        kepsek = st.text_input("Kepala Sekolah", value="Muhammad Saifudin Zuhri, M.Pd.")
-        
-        if st.button("Logout"): 
-            st.session_state['logged_in'] = False
-            st.query_params.clear()
-            st.rerun()
-            
-        # --- 4. FITUR BARU: RIWAYAT MODUL (HISTORY) ---
-        st.divider()
-        st.write("📜 **Riwayat Sesi Ini:**")
-        if 'history' not in st.session_state: st.session_state['history'] = []
-        
-        if st.session_state['history']:
-            for i, h in enumerate(reversed(st.session_state['history'])):
-                with st.expander(f"{h['topik']} ({h['waktu']})"):
-                    if st.button("Muat Ulang", key=f"load_{i}"):
-                        st.session_state.update(h['data'])
-                        st.rerun()
-        else:
-            st.caption("Belum ada modul dibuat.")
-
+    # 1. Identitas
     t1, t2, t3, t4, t5, t6, t7 = st.tabs(["1️⃣ Identitas", "2️⃣ Inti", "3️⃣ Bahan & LKPD", "4️⃣ Evaluasi", "5️⃣ Asesmen", "6️⃣ Glosarium", "7️⃣ Refleksi"])
 
-    with t1: # Identitas
+    with t1:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1: 
@@ -372,16 +312,15 @@ def main_app():
         cp = st.text_area("Capaian Pembelajaran (CP):", height=100)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with t2: # Inti
+    with t2:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         col_inti_1, col_inti_2 = st.columns(2)
-        
         with col_inti_1:
             st.markdown("### 📚 Materi & Tujuan")
             topik = st.text_input("Topik / Bab", value=st.session_state.get('topik', ''))
             model = st.selectbox("Model Pembelajaran", ["Problem-Based Learning (PBL)", "Project-Based Learning (PjBL)", "Discovery Learning (DL)", "Inquiry Learning (IL)"])
             if st.button("✨ Bantu Buat Tujuan"):
-                if not api_key: st.error("API Key Kosong/Salah di secrets.toml")
+                if not api_key: st.error("API Key Kosong")
                 else:
                     with st.spinner("AI Bekerja..."):
                         manage_stats('generate') 
@@ -401,10 +340,10 @@ def main_app():
             pengayaan = st.text_area("Pengayaan:", value="Tugas proyek tambahan atau tutor sebaya.", height=80)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with t3: # Bahan & LKPD
+    with t3:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         if st.button("✨ Auto Materi & LKPD"):
-             if not api_key: st.error("API Key Kosong/Salah")
+             if not api_key: st.error("API Key Kosong")
              else:
                 with st.spinner("Menyusun..."):
                     manage_stats('generate') 
@@ -412,19 +351,8 @@ def main_app():
                     st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan petunjuk LKPD aktivitas siswa topik {topik}.")
                     st.session_state['media_ai'] = tanya_gemini(api_key, f"List media ajar untuk topik {topik}.")
                     
-                    # SIMPAN KE HISTORY
-                    hist_data = {
-                        'waktu': now_time,
-                        'topik': topik,
-                        'data': {
-                            'tujuan_ai': st.session_state.get('tujuan_ai', ''),
-                            'materi_ai': st.session_state['materi_ai'],
-                            'lkpd_ai': st.session_state['lkpd_ai'],
-                            'media_ai': st.session_state['media_ai'],
-                            'topik': topik,
-                            'mapel': mapel
-                        }
-                    }
+                    hist_data = {'waktu': datetime.datetime.now().strftime("%H:%M"), 'topik': topik, 'data': {'tujuan_ai': st.session_state.get('tujuan_ai', ''), 'materi_ai': st.session_state['materi_ai'], 'lkpd_ai': st.session_state['lkpd_ai'], 'media_ai': st.session_state['media_ai'], 'topik': topik, 'mapel': mapel}}
+                    if 'history' not in st.session_state: st.session_state['history'] = []
                     st.session_state['history'].append(hist_data)
                     st.rerun()
 
@@ -436,10 +364,10 @@ def main_app():
         media = st.text_area("Media Ajar:", value=st.session_state.get('media_ai', ''), height=80)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with t4: # Evaluasi
+    with t4:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         if st.button("✨ Auto Soal & Kunci"):
-             if not api_key: st.error("API Key Kosong/Salah")
+             if not api_key: st.error("API Key Kosong")
              else:
                  with st.spinner("Membuat Soal..."):
                      manage_stats('generate') 
@@ -455,23 +383,19 @@ def main_app():
             kunci = st.text_area("Kunci Jawaban:", value=st.session_state.get('kunci_ai', ''), height=250)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with t5: # Asesmen
+    with t5:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
-        st.info("ℹ️ Bagian ini akan menghasilkan tabel Rubrik Penilaian di file akhir.")
-        
         st.write("Teknik Penilaian:")
         teknik_nilai = st.multiselect("Pilih Teknik", ["Tes Tulis", "Lisan", "Observasi", "Unjuk Kerja", "Portofolio", "Proyek"], default=["Tes Tulis", "Observasi"], label_visibility="collapsed")
         
         st.divider()
         st.write("Preview Rubrik Sikap (Otomatis berdasarkan Profil di Tab 2):")
-        
         if profil:
             data_rubrik = []
             for p in profil:
                 data_rubrik.append({"Dimensi": p, "Skor 4": "Membudaya", "Skor 3": "Berkembang", "Skor 2": "Mulai Terlihat", "Skor 1": "Belum Terlihat"})
             st.table(pd.DataFrame(data_rubrik))
-        else:
-            st.warning("⚠️ Belum ada Dimensi Profil yang dipilih di Tab 2 (Komponen Inti).")
+        else: st.warning("⚠️ Belum ada Dimensi Profil yang dipilih di Tab 2.")
 
         st.divider()
         st.write("Ketik nama siswa (1 nama per baris) untuk mengisi Tabel Absensi otomatis:")
@@ -480,13 +404,13 @@ def main_app():
         st.write(f"Terdeteksi: **{len(siswa_list)} Siswa**")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with t6: # Glosarium
+    with t6:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         pustaka = st.text_area("📚 Daftar Pustaka:", value=f"1. Buku Paket Kemdikbud Kelas {kelas}", height=100)
         glosarium = st.text_area("🔤 Glosarium:", placeholder="Istilah sulit...", height=100)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with t7: # Refleksi
+    with t7:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         c_ref1, c_ref2 = st.columns(2)
         with c_ref1:
@@ -497,7 +421,6 @@ def main_app():
             ref_siswa = st.text_area("Catatan Siswa:", placeholder="Respon siswa...", height=150)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- DOWNLOAD ---
     st.markdown("<div class='skeuo-card' style='text-align:center;'>", unsafe_allow_html=True)
     st.success("✅ Dokumen Siap Unduh")
     data_export = {
@@ -512,17 +435,128 @@ def main_app():
     }
     c_dl1, c_dl2 = st.columns(2)
     with c_dl1:
-        st.download_button("📄 DOWNLOAD WORD (.DOCX)", create_docx(data_export), f"Modul_{topik}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        st.download_button("📄 DOWNLOAD WORD (.DOCX)", create_modul_docx(data_export), f"Modul_{topik}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     with c_dl2:
         st.download_button("📕 DOWNLOAD PDF", create_pdf(data_export), f"Modul_{topik}.pdf", "application/pdf")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# LOGIN & SESSION MANAGEMENT
-if "auth" in st.query_params and st.query_params["auth"] == "true":
-    st.session_state['logged_in'] = True
+def menu_atp(api_key, nama_sekolah):
+    st.subheader("🗺️ Generator Alur Tujuan Pembelajaran (ATP)")
+    st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
+    mapel = st.text_input("Mata Pelajaran (ATP)", "IPAS")
+    fase = st.selectbox("Fase (ATP)", ["A", "B", "C"])
+    kelas = st.selectbox("Kelas (ATP)", ["1", "2", "3", "4", "5", "6"])
+    cp_text = st.text_area("Capaian Pembelajaran (CP) yang ingin dipecah:", height=150)
+    
+    if st.button("✨ Generate ATP"):
+        if not api_key: st.error("API Key Kosong")
+        else:
+            with st.spinner("Merancang ATP..."):
+                manage_stats('generate')
+                prompt = f"Buatkan Tabel Alur Tujuan Pembelajaran (ATP) untuk Mapel {mapel} Fase {fase} Kelas {kelas}. Dari CP berikut: {cp_text}. Kolom tabel: No, Elemen, Capaian Pembelajaran, Tujuan Pembelajaran, Alokasi Waktu, Profil Pelajar Pancasila."
+                result = tanya_gemini(api_key, prompt)
+                st.session_state['atp_result'] = result
+    
+    if 'atp_result' in st.session_state:
+        st.markdown(st.session_state['atp_result'])
+        st.download_button("📥 Simpan ATP (.docx)", create_simple_docx("ALUR TUJUAN PEMBELAJARAN (ATP)", st.session_state['atp_result'], nama_sekolah), "ATP.docx")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-if 'logged_in' not in st.session_state: 
-    st.session_state['logged_in'] = False
+def menu_prota(api_key, nama_sekolah):
+    st.subheader("📅 Generator Program Tahunan (Prota)")
+    st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
+    mapel = st.text_input("Mata Pelajaran (Prota)", "Matematika")
+    kelas = st.selectbox("Kelas (Prota)", ["1", "2", "3", "4", "5", "6"])
+    
+    if st.button("✨ Generate Prota"):
+        if not api_key: st.error("API Key Kosong")
+        else:
+            with st.spinner("Menyusun Prota..."):
+                manage_stats('generate')
+                prompt = f"Buatkan Program Tahunan (Prota) untuk Mapel {mapel} SD Kelas {kelas} Kurikulum Merdeka. Distribusikan materi untuk Semester 1 dan Semester 2. Format Tabel: No, Semester, Bab/Topik, Tujuan Pembelajaran Ringkas, Alokasi Waktu."
+                result = tanya_gemini(api_key, prompt)
+                st.session_state['prota_result'] = result
+    
+    if 'prota_result' in st.session_state:
+        st.markdown(st.session_state['prota_result'])
+        st.download_button("📥 Simpan Prota (.docx)", create_simple_docx("PROGRAM TAHUNAN", st.session_state['prota_result'], nama_sekolah), "Prota.docx")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ==========================================
+# 6. APLIKASI UTAMA (MAIN APP)
+# ==========================================
+def main_app():
+    render_header()
+    logins, gens, df_stats = manage_stats() 
+    utc_now = datetime.datetime.utcnow(); jakarta_time = utc_now + datetime.timedelta(hours=7)
+    today_date = jakarta_time.strftime("%d %B %Y"); now_time = jakarta_time.strftime("%H:%M WIB")
+
+    st.markdown("<div class='skeuo-card' style='text-align:center;'><h1 style='color:#0d47a1; margin:0;'>💎 SUPER APP GURU</h1></div>", unsafe_allow_html=True)
+
+    with st.sidebar:
+        st.markdown("<div class='skeuo-card' style='text-align:center;'>⚙️ <b>NAVIGASI</b></div>", unsafe_allow_html=True)
+        
+        # --- MENU PILIHAN ---
+        menu = st.radio("Pilih Alat:", ["📂 Modul Ajar", "🗺️ Generator ATP", "📅 Generator Prota"], index=0)
+        
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style='background:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:15px; text-align:center;'>
+            <h4 style='margin:0;'>📊 Statistik Hari Ini</h4>
+            <p style='font-size:12px; margin-bottom:5px; color:#555;'>{today_date} | {now_time}</p>
+            <p style='margin:0;'>Login: <b>{logins}</b> | Aktivitas: <b>{gens}</b></p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Grafik
+        if not df_stats.empty:
+            st.caption("Tren Aktivitas (7 Hari)")
+            st.bar_chart(df_stats.tail(7).set_index('date')['gen_count'])
+
+        # API KEY
+        if "GEMINI_API_KEY" in st.secrets: api_key = st.secrets["GEMINI_API_KEY"]
+        else: api_key = ""
+        
+        if menu == "📂 Modul Ajar":
+            if st.button("🔄 Reset Modul"):
+                keys = ['tujuan_ai', 'materi_ai', 'lkpd_ai', 'media_ai', 'soal_ai', 'kunci_ai']; 
+                for k in keys: 
+                    if k in st.session_state: del st.session_state[k]
+                st.rerun()
+
+        st.divider()
+        st.write("<b>Identitas Sekolah:</b>", unsafe_allow_html=True)
+        uploaded_logo = st.file_uploader("Upload Logo", type=['png', 'jpg', 'jpeg'])
+        nama_sekolah = st.text_input("Sekolah", value="SD MUHAMMADIYAH 8 TULANGAN")
+        alamat_sekolah = st.text_area("Alamat", value="Jl. Raya Kenongo RT. 02 RW. 01 Tulangan Sidoarjo")
+        kepsek = st.text_input("Kepala Sekolah", value="Muhammad Saifudin Zuhri, M.Pd.")
+        
+        if st.button("Logout"): 
+            st.session_state['logged_in'] = False
+            st.query_params.clear()
+            st.rerun()
+            
+        # History (Hanya muncul di Modul Ajar)
+        if menu == "📂 Modul Ajar":
+            st.divider(); st.write("📜 **Riwayat Sesi Ini:**")
+            if 'history' not in st.session_state: st.session_state['history'] = []
+            if st.session_state['history']:
+                for i, h in enumerate(reversed(st.session_state['history'])):
+                    with st.expander(f"{h['topik']} ({h['waktu']})"):
+                        if st.button("Muat", key=f"load_{i}"): st.session_state.update(h['data']); st.rerun()
+            else: st.caption("Kosong")
+
+    # --- RENDER KONTEN BERDASARKAN MENU ---
+    if menu == "📂 Modul Ajar":
+        menu_modul_ajar(api_key, nama_sekolah, alamat_sekolah, kepsek, uploaded_logo)
+    elif menu == "🗺️ Generator ATP":
+        menu_atp(api_key, nama_sekolah)
+    elif menu == "📅 Generator Prota":
+        menu_prota(api_key, nama_sekolah)
+
+# LOGIN & SESSION
+if "auth" in st.query_params and st.query_params["auth"] == "true": st.session_state['logged_in'] = True
+if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
 
 if not st.session_state['logged_in']:
     render_header()
