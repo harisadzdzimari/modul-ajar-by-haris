@@ -14,6 +14,11 @@ from fpdf import FPDF
 st.set_page_config(page_title="Sistem Administrasi Guru Sultan AI", layout="wide", page_icon="🏫")
 
 # ==========================================
+# 🛑 TEMPEL API KEY ANDA DI BAWAH INI (DI DALAM TANDA KUTIP)
+# ==========================================
+API_KEY_MANUAL = "AIzaSy..." # <--- Hapus tulisan ini dan tempel API Key Anda di sini
+
+# ==========================================
 # 1. SISTEM PELACAKAN (TRACKER)
 # ==========================================
 STATS_FILE = "daily_stats.csv"
@@ -140,30 +145,42 @@ def render_header():
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. FUNGSI LOGIKA (AI DIRECT API)
+# 4. FUNGSI LOGIKA (AI DIRECT API - ANTI ERROR)
 # ==========================================
 def tanya_gemini(api_key, prompt):
-    if not api_key: return "⚠️ API Key tidak ditemukan! Silakan atur di secrets.toml"
+    if not api_key or "AIza" not in api_key: 
+        return "⚠️ API Key belum diisi atau salah format! Cek baris 16 di kode app.py"
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            url_backup = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
-            response_backup = requests.post(url_backup, headers=headers, json=data)
-            if response_backup.status_code == 200:
-                return response_backup.json()['candidates'][0]['content']['parts'][0]['text']
+    # DAFTAR MODEL (Akan dicoba satu per satu sampai berhasil)
+    models_to_try = [
+        "gemini-1.5-flash",        # Opsi 1: Paling Cepat
+        "gemini-1.5-flash-latest", # Opsi 2: Alternatif Flash
+        "gemini-pro"               # Opsi 3: Paling Stabil (Legacy)
+    ]
+    
+    last_error = ""
+    
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200:
+                # BERHASIL! Langsung kembalikan teks
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
             else:
-                return f"Error API: {response.text}"
-    except Exception as e:
-        return f"Error Koneksi: {str(e)}"
+                last_error = f"Model {model} Gagal ({response.status_code}). Mencoba model lain..."
+                continue # Coba model berikutnya
+        except Exception as e:
+            last_error = str(e)
+            continue
 
-# FUNGSI EXPORT DOCX SEDERHANA UNTUK TEXT (ATP/PROTA)
+    # Jika semua model gagal
+    return f"❌ Gagal Generate. Semua model sibuk/error. Pesan terakhir: {last_error}"
+
+# FUNGSI EXPORT DOCX SEDERHANA
 def create_simple_docx(title, content, sekolah):
     doc = Document()
     doc.add_heading(title, 0)
@@ -173,7 +190,7 @@ def create_simple_docx(title, content, sekolah):
     buf = BytesIO(); doc.save(buf); buf.seek(0)
     return buf
 
-# FUNGSI EXPORT DOCX MODUL AJAR (YANG LENGKAP)
+# FUNGSI EXPORT DOCX MODUL AJAR
 def create_modul_docx(data):
     doc = Document()
     for s in doc.sections: s.top_margin = s.bottom_margin = s.left_margin = s.right_margin = Cm(2.54)
@@ -320,13 +337,11 @@ def menu_modul_ajar(api_key, nama_sekolah, alamat_sekolah, kepsek, uploaded_logo
             topik = st.text_input("Topik / Bab", value=st.session_state.get('topik', ''))
             model = st.selectbox("Model Pembelajaran", ["Problem-Based Learning (PBL)", "Project-Based Learning (PjBL)", "Discovery Learning (DL)", "Inquiry Learning (IL)"])
             if st.button("✨ Bantu Buat Tujuan"):
-                if not api_key: st.error("API Key Kosong")
-                else:
-                    with st.spinner("AI Bekerja..."):
-                        manage_stats('generate') 
-                        p = f"Buatkan tujuan pembelajaran (TP) dan pertanyaan pemantik untuk mapel {mapel} topik {topik} fase {fase} model {model}."
-                        st.session_state['tujuan_ai'] = tanya_gemini(api_key, p)
-                        st.rerun()
+                with st.spinner("AI Bekerja..."):
+                    manage_stats('generate') 
+                    p = f"Buatkan tujuan pembelajaran (TP) dan pertanyaan pemantik untuk mapel {mapel} topik {topik} fase {fase} model {model}."
+                    st.session_state['tujuan_ai'] = tanya_gemini(api_key, p)
+                    st.rerun()
             tujuan = st.text_area("Tujuan Pembelajaran (TP)", value=st.session_state.get('tujuan_ai', ''), height=150)
             pemantik = st.text_input("Pertanyaan Pemantik", placeholder="Mengapa kita perlu...?")
 
@@ -343,18 +358,16 @@ def menu_modul_ajar(api_key, nama_sekolah, alamat_sekolah, kepsek, uploaded_logo
     with t3:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         if st.button("✨ Auto Materi & LKPD"):
-             if not api_key: st.error("API Key Kosong")
-             else:
-                with st.spinner("Menyusun..."):
-                    manage_stats('generate') 
-                    st.session_state['materi_ai'] = tanya_gemini(api_key, f"Ringkasan materi {topik} SD kelas {kelas}.")
-                    st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan petunjuk LKPD aktivitas siswa topik {topik}.")
-                    st.session_state['media_ai'] = tanya_gemini(api_key, f"List media ajar untuk topik {topik}.")
-                    
-                    hist_data = {'waktu': datetime.datetime.now().strftime("%H:%M"), 'topik': topik, 'data': {'tujuan_ai': st.session_state.get('tujuan_ai', ''), 'materi_ai': st.session_state['materi_ai'], 'lkpd_ai': st.session_state['lkpd_ai'], 'media_ai': st.session_state['media_ai'], 'topik': topik, 'mapel': mapel}}
-                    if 'history' not in st.session_state: st.session_state['history'] = []
-                    st.session_state['history'].append(hist_data)
-                    st.rerun()
+            with st.spinner("Menyusun..."):
+                manage_stats('generate') 
+                st.session_state['materi_ai'] = tanya_gemini(api_key, f"Ringkasan materi {topik} SD kelas {kelas}.")
+                st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan petunjuk LKPD aktivitas siswa topik {topik}.")
+                st.session_state['media_ai'] = tanya_gemini(api_key, f"List media ajar untuk topik {topik}.")
+                
+                hist_data = {'waktu': datetime.datetime.now().strftime("%H:%M"), 'topik': topik, 'data': {'tujuan_ai': st.session_state.get('tujuan_ai', ''), 'materi_ai': st.session_state['materi_ai'], 'lkpd_ai': st.session_state['lkpd_ai'], 'media_ai': st.session_state['media_ai'], 'topik': topik, 'mapel': mapel}}
+                if 'history' not in st.session_state: st.session_state['history'] = []
+                st.session_state['history'].append(hist_data)
+                st.rerun()
 
         st.markdown("#### 📖 Ringkasan Bahan Ajar")
         bahan = st.text_area("Materi:", value=st.session_state.get('materi_ai', ''), height=200)
@@ -367,13 +380,11 @@ def menu_modul_ajar(api_key, nama_sekolah, alamat_sekolah, kepsek, uploaded_logo
     with t4:
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         if st.button("✨ Auto Soal & Kunci"):
-             if not api_key: st.error("API Key Kosong")
-             else:
-                 with st.spinner("Membuat Soal..."):
-                     manage_stats('generate') 
-                     st.session_state['soal_ai'] = tanya_gemini(api_key, f"Buatkan 5 Soal Essay HOTS tentang {topik}.")
-                     st.session_state['kunci_ai'] = tanya_gemini(api_key, f"Buatkan Kunci Jawaban untuk soal essay topik {topik}.")
-                     st.rerun()
+             with st.spinner("Membuat Soal..."):
+                 manage_stats('generate') 
+                 st.session_state['soal_ai'] = tanya_gemini(api_key, f"Buatkan 5 Soal Essay HOTS tentang {topik}.")
+                 st.session_state['kunci_ai'] = tanya_gemini(api_key, f"Buatkan Kunci Jawaban untuk soal essay topik {topik}.")
+                 st.rerun()
         c_ev1, c_ev2 = st.columns(2)
         with c_ev1:
             st.markdown("#### ❓ Soal Latihan")
@@ -449,13 +460,11 @@ def menu_atp(api_key, nama_sekolah):
     cp_text = st.text_area("Capaian Pembelajaran (CP) yang ingin dipecah:", height=150)
     
     if st.button("✨ Generate ATP"):
-        if not api_key: st.error("API Key Kosong")
-        else:
-            with st.spinner("Merancang ATP..."):
-                manage_stats('generate')
-                prompt = f"Buatkan Tabel Alur Tujuan Pembelajaran (ATP) untuk Mapel {mapel} Fase {fase} Kelas {kelas}. Dari CP berikut: {cp_text}. Kolom tabel: No, Elemen, Capaian Pembelajaran, Tujuan Pembelajaran, Alokasi Waktu, Profil Pelajar Pancasila."
-                result = tanya_gemini(api_key, prompt)
-                st.session_state['atp_result'] = result
+        with st.spinner("Merancang ATP..."):
+            manage_stats('generate')
+            prompt = f"Buatkan Tabel Alur Tujuan Pembelajaran (ATP) untuk Mapel {mapel} Fase {fase} Kelas {kelas}. Dari CP berikut: {cp_text}. Kolom tabel: No, Elemen, Capaian Pembelajaran, Tujuan Pembelajaran, Alokasi Waktu, Profil Pelajar Pancasila."
+            result = tanya_gemini(api_key, prompt)
+            st.session_state['atp_result'] = result
     
     if 'atp_result' in st.session_state:
         st.markdown(st.session_state['atp_result'])
@@ -469,13 +478,11 @@ def menu_prota(api_key, nama_sekolah):
     kelas = st.selectbox("Kelas (Prota)", ["1", "2", "3", "4", "5", "6"])
     
     if st.button("✨ Generate Prota"):
-        if not api_key: st.error("API Key Kosong")
-        else:
-            with st.spinner("Menyusun Prota..."):
-                manage_stats('generate')
-                prompt = f"Buatkan Program Tahunan (Prota) untuk Mapel {mapel} SD Kelas {kelas} Kurikulum Merdeka. Distribusikan materi untuk Semester 1 dan Semester 2. Format Tabel: No, Semester, Bab/Topik, Tujuan Pembelajaran Ringkas, Alokasi Waktu."
-                result = tanya_gemini(api_key, prompt)
-                st.session_state['prota_result'] = result
+        with st.spinner("Menyusun Prota..."):
+            manage_stats('generate')
+            prompt = f"Buatkan Program Tahunan (Prota) untuk Mapel {mapel} SD Kelas {kelas} Kurikulum Merdeka. Distribusikan materi untuk Semester 1 dan Semester 2. Format Tabel: No, Semester, Bab/Topik, Tujuan Pembelajaran Ringkas, Alokasi Waktu."
+            result = tanya_gemini(api_key, prompt)
+            st.session_state['prota_result'] = result
     
     if 'prota_result' in st.session_state:
         st.markdown(st.session_state['prota_result'])
@@ -513,9 +520,13 @@ def main_app():
             st.caption("Tren Aktivitas (7 Hari)")
             st.bar_chart(df_stats.tail(7).set_index('date')['gen_count'])
 
-        # API KEY
-        if "GEMINI_API_KEY" in st.secrets: api_key = st.secrets["GEMINI_API_KEY"]
-        else: api_key = ""
+        # API KEY DARI VARIABEL MANUAL / SECRETS
+        if API_KEY_MANUAL != "":
+            api_key = API_KEY_MANUAL
+        elif "GEMINI_API_KEY" in st.secrets: 
+            api_key = st.secrets["GEMINI_API_KEY"]
+        else: 
+            api_key = ""
         
         if menu == "📂 Modul Ajar":
             if st.button("🔄 Reset Modul"):
