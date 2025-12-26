@@ -18,8 +18,16 @@ st.set_page_config(page_title="Sistem Modul Ajar Sultan AI", layout="wide", page
 # ==========================================
 STATS_FILE = "daily_stats.csv"
 
+def get_jakarta_time():
+    """Mengambil waktu server UTC lalu dikonversi ke WIB (UTC+7)"""
+    utc_now = datetime.datetime.utcnow()
+    jakarta_time = utc_now + datetime.timedelta(hours=7)
+    return jakarta_time
+
 def manage_stats(action=None):
-    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    # Gunakan waktu Jakarta untuk pencatatan tanggal
+    now_jakarta = get_jakarta_time()
+    today_str = now_jakarta.strftime("%Y-%m-%d")
     
     if not os.path.exists(STATS_FILE):
         df = pd.DataFrame(columns=["date", "login_count", "gen_count"])
@@ -277,11 +285,14 @@ def create_pdf(data):
 def main_app():
     render_header()
     
-    # Ambil statistik
+    # Ambil statistik & Waktu (GMT+7)
     logins, gens = manage_stats() 
-    # WAKTU & TANGGAL
-    today_date = datetime.date.today().strftime("%d %B %Y")
-    now_time = datetime.datetime.now().strftime("%H:%M WIB")
+    
+    # WAKTU & TANGGAL (GMT+7 MANUAL FIX)
+    utc_now = datetime.datetime.utcnow()
+    jakarta_time = utc_now + datetime.timedelta(hours=7)
+    today_date = jakarta_time.strftime("%d %B %Y")
+    now_time = jakarta_time.strftime("%H:%M WIB")
 
     st.markdown("<div class='skeuo-card' style='text-align:center;'><h1 style='color:#0d47a1; margin:0;'>💎 GENERATOR MODUL AJAR</h1></div>", unsafe_allow_html=True)
 
@@ -297,6 +308,7 @@ def main_app():
         </div>
         """, unsafe_allow_html=True)
         
+        # API Key (Hanya Input Manual, Cloud Error Dihapus)
         api_key = st.text_input("Tempel API Key Gemini", type="password")
         if api_key: st.success("✅ AI Siap Digunakan")
         
