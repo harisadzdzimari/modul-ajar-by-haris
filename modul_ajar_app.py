@@ -312,7 +312,7 @@ def main_app():
         if "GEMINI_API_KEY" in st.secrets:
             api_key = st.secrets["GEMINI_API_KEY"]
         else:
-            api_key = "" # Kosong jika tidak ada di secrets (bisa di hardcode disini jika mau)
+            api_key = "" 
         
         st.divider()
         st.write("<b>Identitas Sekolah:</b>", unsafe_allow_html=True)
@@ -321,7 +321,11 @@ def main_app():
         alamat_sekolah = st.text_area("Alamat", value="Jl. Raya Kenongo RT. 02 RW. 01 Tulangan Sidoarjo")
         kepsek = st.text_input("Kepala Sekolah", value="Muhammad Saifudin Zuhri, M.Pd.")
         
-        if st.button("Logout"): st.session_state['logged_in'] = False; st.rerun()
+        if st.button("Logout"): 
+            st.session_state['logged_in'] = False
+            # Hapus Query Param saat logout
+            st.query_params.clear()
+            st.rerun()
 
     t1, t2, t3, t4, t5, t6, t7 = st.tabs(["1️⃣ Identitas", "2️⃣ Inti", "3️⃣ Bahan & LKPD", "4️⃣ Evaluasi", "5️⃣ Asesmen", "6️⃣ Glosarium", "7️⃣ Refleksi"])
 
@@ -468,8 +472,14 @@ def main_app():
         st.download_button("📕 DOWNLOAD PDF", create_pdf(data_export), f"Modul_{topik}.pdf", "application/pdf")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# LOGIN
-if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
+# LOGIN & SESSION MANAGEMENT
+# Cek apakah ada query param 'auth' (tanda sudah login)
+if "auth" in st.query_params and st.query_params["auth"] == "true":
+    st.session_state['logged_in'] = True
+
+if 'logged_in' not in st.session_state: 
+    st.session_state['logged_in'] = False
+
 if not st.session_state['logged_in']:
     render_header()
     st.markdown("<br><br><div class='skeuo-card' style='max-width:400px; margin:auto; text-align:center;'><h2>🔐 LOGIN</h2><hr></div>", unsafe_allow_html=True)
@@ -479,7 +489,10 @@ if not st.session_state['logged_in']:
         if st.button("MASUK"): 
             if u=="guru" and p=="123": 
                 manage_stats('login') 
-                st.session_state['logged_in']=True
+                st.session_state['logged_in'] = True
+                # Set query param agar tahan refresh
+                st.query_params["auth"] = "true"
                 st.rerun()
             else: st.error("Gagal")
-else: main_app()
+else: 
+    main_app()
