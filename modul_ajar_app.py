@@ -1,8 +1,9 @@
 import streamlit as st
 import datetime
 import pandas as pd
-import requests # KITA PAKAI INI UNTUK BYPASS ERROR LIBRARY
+import requests
 import json
+import os
 from io import BytesIO
 from docx import Document
 from docx.shared import Inches, Pt, Cm
@@ -13,7 +14,44 @@ from fpdf import FPDF
 st.set_page_config(page_title="Sistem Modul Ajar Sultan AI", layout="wide", page_icon="🏫")
 
 # ==========================================
-# 1. CSS SKEUOMORPHISM & STYLE
+# 1. SISTEM PELACAKAN (TRACKER)
+# ==========================================
+STATS_FILE = "daily_stats.csv"
+
+def manage_stats(action=None):
+    """
+    Fungsi untuk mencatat Login dan Generasi Modul harian.
+    action: 'login' atau 'generate' atau None (hanya baca)
+    """
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    
+    # 1. Cek apakah file ada, jika tidak buat baru
+    if not os.path.exists(STATS_FILE):
+        df = pd.DataFrame(columns=["date", "login_count", "gen_count"])
+        df.to_csv(STATS_FILE, index=False)
+    
+    df = pd.read_csv(STATS_FILE)
+    
+    # 2. Cek apakah hari ini sudah ada datanya
+    if today_str not in df['date'].values:
+        new_row = pd.DataFrame({"date": [today_str], "login_count": [0], "gen_count": [0]})
+        df = pd.concat([df, new_row], ignore_index=True)
+    
+    # 3. Update Data
+    if action == 'login':
+        df.loc[df['date'] == today_str, 'login_count'] += 1
+    elif action == 'generate':
+        df.loc[df['date'] == today_str, 'gen_count'] += 1
+        
+    # Simpan kembali
+    df.to_csv(STATS_FILE, index=False)
+    
+    # Return data hari ini untuk ditampilkan
+    today_data = df.loc[df['date'] == today_str].iloc[0]
+    return today_data['login_count'], today_data['gen_count']
+
+# ==========================================
+# 2. CSS SKEUOMORPHISM & STYLE
 # ==========================================
 st.markdown("""
 <style>
@@ -69,13 +107,21 @@ st.markdown("""
         color: #0d47a1; font-weight: bold; font-size: 14px; text-align: right;
     }
     
+    /* FOOTER FIXED */
+    .footer {
+        position: fixed; left: 0; bottom: 0; width: 100%;
+        background-color: #e0e5ec; color: #555; text-align: center;
+        padding: 10px; font-weight: bold; box-shadow: 0px -4px 10px rgba(0,0,0,0.1); z-index: 9999;
+        font-size: 14px;
+    }
+    
     h3 { color: #0d47a1; font-weight: bold; margin-bottom: 15px; }
     h4 { color: #333; font-weight: bold; margin-bottom: 10px; font-size: 16px; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. HEADER & JAM (JS)
+# 3. HEADER & JAM (JS)
 # ==========================================
 def render_header():
     st.markdown("""
@@ -88,45 +134,39 @@ def render_header():
         <script>
             function updateTime() {
                 const now = new Date();
-                document.getElementById('clock').innerHTML = now.toLocaleDateString('id-ID', {weekday:'long', year:'numeric', month:'long', day:'numeric'}) + '<br>' + now.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) + ' WIB';
+                const optionsDate = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                document.getElementById('clock').innerHTML = now.toLocaleDateString('id-ID', optionsDate) + '<br>' + now.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) + ' WIB';
             }
             setInterval(updateTime, 1000); updateTime();
         </script>
-        <div style="text-align:center; padding:10px; color:#555; font-size:12px; margin-bottom:10px;">Aplikasi by Haris Adz Dzimari</div>
+        
+        <div class="footer">Aplikasi by Haris Adz Dzimari &copy; 2025</div>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. FUNGSI LOGIKA (AI DIRECT API & DOKUMEN)
+# 4. FUNGSI LOGIKA (AI DIRECT API & DOKUMEN)
 # ==========================================
 
-# --- PERBAIKAN: MENGGUNAKAN REST API LANGSUNG (ANTI ERROR 404) ---
+# MENGGUNAKAN REST API LANGSUNG (ANTI ERROR 404)
 def tanya_gemini(api_key, prompt):
     if not api_key: return "⚠️ Masukkan API Key!"
     
-    # URL API Google (Kita pakai jalur web langsung, bukan lewat library yg error)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    
     headers = {'Content-Type': 'application/json'}
-    data = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
+    data = {"contents": [{"parts": [{"text": prompt}]}]}
     
     try:
         response = requests.post(url, headers=headers, json=data)
-        
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            # Jika 1.5-flash gagal, coba fallback ke gemini-pro (backup)
+            # Fallback ke gemini-pro jika flash gagal
             url_backup = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
             response_backup = requests.post(url_backup, headers=headers, json=data)
             if response_backup.status_code == 200:
                 return response_backup.json()['candidates'][0]['content']['parts'][0]['text']
             else:
                 return f"Error API: {response.text}"
-                
     except Exception as e:
         return f"Error Koneksi: {str(e)}"
 
@@ -247,15 +287,28 @@ def create_pdf(data):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 # ==========================================
-# 4. APLIKASI UTAMA
+# 5. APLIKASI UTAMA
 # ==========================================
 def main_app():
     render_header()
+    
+    # Ambil statistik hari ini
+    logins, gens = manage_stats() 
+
     st.markdown("<div class='skeuo-card' style='text-align:center;'><h1 style='color:#0d47a1; margin:0;'>💎 GENERATOR MODUL AJAR</h1></div>", unsafe_allow_html=True)
 
     with st.sidebar:
         st.markdown("<div class='skeuo-card' style='text-align:center;'>⚙️ <b>KONFIGURASI</b></div>", unsafe_allow_html=True)
-        # Ambil API KEY dari Secrets atau Input Manual
+        
+        # --- STATISTIK HARI INI ---
+        st.markdown(f"""
+        <div style='background:#f0f2f6; padding:10px; border-radius:10px; margin-bottom:15px; text-align:center;'>
+            <h4 style='margin:0;'>📊 Statistik Hari Ini</h4>
+            <p style='margin:0;'>Login: <b>{logins}</b> | Modul: <b>{gens}</b></p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # API Key
         if "GEMINI_API_KEY" in st.secrets:
             api_key = st.secrets["GEMINI_API_KEY"]
             st.success("✅ AI Ready (Cloud)")
@@ -300,8 +353,11 @@ def main_app():
                 if not api_key: st.error("API Key Kosong")
                 else:
                     with st.spinner("AI Bekerja..."):
+                        # TRACKING GENERATE
+                        manage_stats('generate')
                         p = f"Buatkan tujuan pembelajaran (TP) dan pertanyaan pemantik untuk mapel {mapel} topik {topik} fase {fase} model {model}."
                         st.session_state['tujuan_ai'] = tanya_gemini(api_key, p)
+                        st.rerun() # Rerun untuk update counter
             tujuan = st.text_area("Tujuan Pembelajaran (TP)", value=st.session_state.get('tujuan_ai', ''), height=150)
             pemantik = st.text_input("Pertanyaan Pemantik", placeholder="Mengapa kita perlu...?")
 
@@ -321,9 +377,11 @@ def main_app():
              if not api_key: st.error("API Key Kosong")
              else:
                 with st.spinner("Menyusun..."):
+                    manage_stats('generate')
                     st.session_state['materi_ai'] = tanya_gemini(api_key, f"Ringkasan materi {topik} SD kelas {kelas}.")
                     st.session_state['lkpd_ai'] = tanya_gemini(api_key, f"Buatkan petunjuk LKPD aktivitas siswa topik {topik}.")
                     st.session_state['media_ai'] = tanya_gemini(api_key, f"List media ajar untuk topik {topik}.")
+                    st.rerun()
         st.markdown("#### 📖 Ringkasan Bahan Ajar")
         bahan = st.text_area("Materi:", value=st.session_state.get('materi_ai', ''), height=200)
         st.divider()
@@ -338,8 +396,10 @@ def main_app():
              if not api_key: st.error("API Key Kosong")
              else:
                  with st.spinner("Membuat Soal..."):
+                     manage_stats('generate')
                      st.session_state['soal_ai'] = tanya_gemini(api_key, f"Buatkan 5 Soal Essay HOTS tentang {topik}.")
                      st.session_state['kunci_ai'] = tanya_gemini(api_key, f"Buatkan Kunci Jawaban untuk soal essay topik {topik}.")
+                     st.rerun()
         c_ev1, c_ev2 = st.columns(2)
         with c_ev1:
             st.markdown("#### ❓ Soal Latihan")
@@ -353,31 +413,20 @@ def main_app():
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         st.info("ℹ️ Bagian ini akan menghasilkan tabel Rubrik Penilaian di file akhir.")
         
-        # 1. Teknik Penilaian (Multiselect)
         st.write("Teknik Penilaian:")
         teknik_nilai = st.multiselect("Pilih Teknik", ["Tes Tulis", "Lisan", "Observasi", "Unjuk Kerja", "Portofolio", "Proyek"], default=["Tes Tulis", "Observasi"], label_visibility="collapsed")
         
-        # 2. Preview Rubrik
         st.divider()
         st.write("Preview Rubrik Sikap (Otomatis berdasarkan Profil di Tab 2):")
         
-        # Bikin Dataframe untuk Preview
         if profil:
             data_rubrik = []
             for p in profil:
-                data_rubrik.append({
-                    "Dimensi": p,
-                    "Skor 4": "Membudaya",
-                    "Skor 3": "Berkembang",
-                    "Skor 2": "Mulai Terlihat",
-                    "Skor 1": "Belum Terlihat"
-                })
-            df_rubrik = pd.DataFrame(data_rubrik)
-            st.table(df_rubrik)
+                data_rubrik.append({"Dimensi": p, "Skor 4": "Membudaya", "Skor 3": "Berkembang", "Skor 2": "Mulai Terlihat", "Skor 1": "Belum Terlihat"})
+            st.table(pd.DataFrame(data_rubrik))
         else:
             st.warning("⚠️ Belum ada Dimensi Profil yang dipilih di Tab 2 (Komponen Inti).")
 
-        # 3. Input Siswa
         st.divider()
         st.write("Ketik nama siswa (1 nama per baris) untuk mengisi Tabel Absensi otomatis:")
         raw_siswa = st.text_area("Daftar Nama Siswa:", height=150, placeholder="Adi\nBudi\nCici...")
@@ -425,11 +474,16 @@ def main_app():
 # LOGIN
 if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
 if not st.session_state['logged_in']:
-    render_header(); st.markdown("<br><br><div class='skeuo-card' style='max-width:400px; margin:auto; text-align:center;'><h2>🔐 LOGIN</h2><hr></div>", unsafe_allow_html=True)
+    render_header()
+    st.markdown("<br><br><div class='skeuo-card' style='max-width:400px; margin:auto; text-align:center;'><h2>🔐 LOGIN</h2><hr></div>", unsafe_allow_html=True)
     c1,c2,c3 = st.columns([1,1,1])
     with c2:
         u = st.text_input("User"); p = st.text_input("Pass", type="password")
         if st.button("MASUK"): 
-            if u=="guru" and p=="123": st.session_state['logged_in']=True; st.rerun()
+            if u=="guru" and p=="123": 
+                # TRACKING LOGIN
+                manage_stats('login')
+                st.session_state['logged_in']=True
+                st.rerun()
             else: st.error("Gagal")
 else: main_app()
