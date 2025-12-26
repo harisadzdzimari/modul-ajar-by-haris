@@ -25,7 +25,7 @@ def get_jakarta_time():
     return jakarta_time
 
 def manage_stats(action=None):
-    # Gunakan waktu Jakarta untuk pencatatan tanggal
+    # Gunakan waktu Jakarta
     now_jakarta = get_jakarta_time()
     today_str = now_jakarta.strftime("%Y-%m-%d")
     
@@ -142,10 +142,10 @@ def render_header():
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. FUNGSI LOGIKA (AI DIRECT API & DOKUMEN)
+# 4. FUNGSI LOGIKA (AI DIRECT API)
 # ==========================================
 def tanya_gemini(api_key, prompt):
-    if not api_key: return "⚠️ Masukkan API Key!"
+    if not api_key: return "⚠️ API Key tidak ditemukan! Silakan atur di secrets.toml"
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {'Content-Type': 'application/json'}
@@ -308,9 +308,11 @@ def main_app():
         </div>
         """, unsafe_allow_html=True)
         
-        # API Key (Hanya Input Manual, Cloud Error Dihapus)
-        api_key = st.text_input("Tempel API Key Gemini", type="password")
-        if api_key: st.success("✅ AI Siap Digunakan")
+        # LOGIKA API KEY (OTOMATIS DARI SECRETS)
+        if "GEMINI_API_KEY" in st.secrets:
+            api_key = st.secrets["GEMINI_API_KEY"]
+        else:
+            api_key = "" # Kosong jika tidak ada di secrets (bisa di hardcode disini jika mau)
         
         st.divider()
         st.write("<b>Identitas Sekolah:</b>", unsafe_allow_html=True)
@@ -346,7 +348,7 @@ def main_app():
             topik = st.text_input("Topik / Bab")
             model = st.selectbox("Model Pembelajaran", ["Problem-Based Learning (PBL)", "Project-Based Learning (PjBL)", "Discovery Learning (DL)", "Inquiry Learning (IL)"])
             if st.button("✨ Bantu Buat Tujuan"):
-                if not api_key: st.error("API Key Kosong")
+                if not api_key: st.error("API Key Kosong/Salah di secrets.toml")
                 else:
                     with st.spinner("AI Bekerja..."):
                         manage_stats('generate') 
@@ -369,7 +371,7 @@ def main_app():
     with t3: # Bahan & LKPD
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         if st.button("✨ Auto Materi & LKPD"):
-             if not api_key: st.error("API Key Kosong")
+             if not api_key: st.error("API Key Kosong/Salah")
              else:
                 with st.spinner("Menyusun..."):
                     manage_stats('generate') 
@@ -388,7 +390,7 @@ def main_app():
     with t4: # Evaluasi
         st.markdown("<div class='skeuo-card'>", unsafe_allow_html=True)
         if st.button("✨ Auto Soal & Kunci"):
-             if not api_key: st.error("API Key Kosong")
+             if not api_key: st.error("API Key Kosong/Salah")
              else:
                  with st.spinner("Membuat Soal..."):
                      manage_stats('generate') 
